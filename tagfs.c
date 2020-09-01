@@ -47,15 +47,12 @@ bool tagfs_chk(tagfs_context_t *context)
 		if(strchr(name, '/'))
 			ERR("Entry name '%s' may not contain '/'\n", name);
 
-		struct stat s;
-		bool exists = !fstatat(context->dirfd, name, &s, AT_SYMLINK_NOFOLLOW);
+		bool exists = !faccessat(context->dirfd, name, F_OK, AT_SYMLINK_NOFOLLOW);
 
 		if(entry->kind == TDB_FILE_ENTRY)
 		{
 			if(!exists)
-				ERR("Cannot stat file '%s': %s\n", name, strerror(errno))
-			if(s.st_mode & S_IFDIR)
-				ERR("File entry '%s' is for a directory\n", name)
+				ERR("No file for entry '%s': %s\n", name, strerror(errno))
 		}
 		else
 		{
@@ -63,6 +60,21 @@ bool tagfs_chk(tagfs_context_t *context)
 				ERR("Tag '%s' conflicts with existing file\n", name)
 		}
 	})
+
+	struct dirent *ent;
+
+	// iterate over existing real files
+	while((ent = readdir(context->dir)))
+	{
+		if(ent->d_name[0] == TAGFS_NEG_CHAR)
+			ERR("Real file '%s' may not start with '%c' as it is reserved for negating tags\n", ent->d_name, TAGFS_NEG_CHAR)
+		if(ent->d_name[0] == '.' && tdb_get(context->tdb, ent->d_name + 1))
+			ERR("Real file '%s' conflicts with tag '%s'\n", ent->d_name, ent->d_name + 1);
+		if(ent->d_type == DT_DIR)
+			ERR("Real file '%s' may not be a directory", ent->d_name);
+	}
+
+	rewinddir(context->dir);
 
 	return chk;
 	#undef ERR
