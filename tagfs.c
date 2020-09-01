@@ -58,7 +58,7 @@ int tagfs_chk(tagfs_context_t *context)
 	// iterate over existing real files
 	while((ent = readdir(context->dir)))
 	{
-		if(specialDir(ent->d_name))
+		if(specialDir(ent->d_name) || tdbFile(ent->d_name))
 			continue;
 		if(ent->d_name[0] == TAGFS_NEG_CHAR)
 			IERR("Real file '%s' may not start with '%c' as it is reserved for negating tags\n", ent->d_name, TAGFS_NEG_CHAR)

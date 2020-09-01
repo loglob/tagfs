@@ -70,6 +70,22 @@ enum tagfs_flags
 
 #pragma region Internal Functions
 
+bool specialDir(const char *path)
+{
+	if(*path == '/')
+		path++;
+
+	return !*path || strcmp(path, ".") || strcmp(path, "..");
+}
+
+bool tdbFile(const char *path)
+{
+	if(*path == '/')
+		path++;
+
+	return strncmp(path, ".tagdb", 6) == 0;
+}
+
 static char *split(const char *_path, const char **_fname)
 {
 	if(*_path == '/')
@@ -100,7 +116,7 @@ static char *split(const char *_path, const char **_fname)
 
 
 /* Attempts to retrieve a tagdb entry. flags must contain TFS_FILE, TFS_TAG or both.
-	Filters out the .tagdb file. */
+	Filters out tagdb files and special dirs. */
 static inline tagdb_entry_t *tagfs_get(const char *name, enum tagfs_flags flags)
 {
 	#define fail(eno) { errno=eno; return NULL; }
@@ -152,7 +168,7 @@ static inline tagdb_entry_t *tagfs_get(const char *name, enum tagfs_flags flags)
 			return e;
 	}
 
-	if((flags & TFS_MKFILE) && (flags & TFS_FILE) && strcmp(name, ".tagdb") && !faccessat(CONTEXT->dirfd, name, F_OK, AT_SYMLINK_NOFOLLOW))
+	if((flags & TFS_MKFILE) && (flags & TFS_FILE) && !tdbFile(name) && !specialDir(name) && !faccessat(CONTEXT->dirfd, name, F_OK, AT_SYMLINK_NOFOLLOW))
 	{
 	//	dbprintf("GET found existing file\n");
 
@@ -284,6 +300,14 @@ static tagdb_entrykind_t tagfs_resolve(const char *_path, tagdb_entry_t **_entry
 
 	if(_fname)
 		*_fname = fname;
+
+	if(specialDir(fname))
+		return TDB_TAG_ENTRY;
+	if(tdbFile(fname))
+	{
+		errno = ENOENT;
+		return TDB_EMPTY_ENTRY;	
+	}
 	
 	tagdb_entry_t *entry = tagfs_get(fname, TFS_CHKALL | TFS_CHKNEG);
 
@@ -328,13 +352,6 @@ inline static bool tagfs_exists(const char *entry)
 	return false;
 }
 
-bool specialDir(const char *path)
-{
-	if(*path == '/')
-		path++;
-
-	return !*path || strcmp(path, ".") || strcmp(path, "..");
-}
 
 #pragma endregion
 
@@ -361,19 +378,14 @@ int tagfs_readdir(const char *_path, void *buf, fuse_fill_dir_t filler, UNUSED o
 	int anyP = bitarr_any(positive, tdb->tagCap, true);
 	struct dirent *ent;
 
-	// Marks that the .tagdb file hasn't been seen yet (avoids the strcmp call)
-	bool gotTdb = false;
 
 	// iterate over existing real files
 	while((ent = readdir(context->dir)))
 	{
 		// filter out the .tagdb file
-		if(!gotTdb && strcmp(".tagdb", ent->d_name) == 0)
-		{
-			gotTdb = true;
+		if(tdbFile(ent->d_name))
 			continue;
-		}
-
+		
 		tagdb_entry_t *entry = tdb_get(tdb, ent->d_name);
 
 		if(entry)
@@ -476,7 +488,7 @@ int tagfs_mknod(const char *_path, mode_t mode, dev_t dev)
 	
 	if(!path)
 		return -ENOMEM;
-	if(tagfs_get(fname, TFS_CHKALL) || !errno || strcmp(_path, ".tagdb") == 0)
+	if(tagfs_get(fname, TFS_CHKALL) || !errno || tdbFile(fname))
 		return -EEXIST;
 	if(fname[0] == TAGFS_NEG_CHAR)
 		return -EINVAL;
@@ -532,7 +544,7 @@ int tagfs_mkdir(const char *_path, mode_t mode)
 		return -ENOTSUP;
 	if(!tagfs_validQuery(_path, &fname))
 		return -errno;
-	if(tagfs_get(fname, TFS_CHKALL) || !errno || strcmp(_path, ".tagdb") == 0)
+	if(tagfs_get(fname, TFS_CHKALL) || !errno || tdbFile(fname) || specialDir(fname))
 		return -EEXIST;
 	if(fname[0] == TAGFS_NEG_CHAR)
 		return -EINVAL;
