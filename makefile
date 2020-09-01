@@ -14,10 +14,12 @@ tagfs: tagfs.c tagdb.h hashmap.h bitarr.h futil.h
 remount: umount mount
 
 mount: tagfs-debug
+	mkdir -p dir
 	ulimit -c unlimited
 	./tagfs-debug -l log dir
 
 grind: tagfs-debug
+	mkdir -p dir
 	ulimit -c unlimited
 	valgrind --leak-check=full ./tagfs-debug -l log dir
 

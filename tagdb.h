@@ -362,7 +362,7 @@ tagdb_t *tdb_open(FILE *f)
 				fprintf(stderr, "Relationship %s->%s present twice - ignoring duplicate definition\n", tagName, fileName);
 			else
 				bitarr_set(file->fileTags, tagId, true);
-
+			
 			free(fileName);
 		}
 		

@@ -328,6 +328,14 @@ inline static bool tagfs_exists(const char *entry)
 	return false;
 }
 
+bool specialDir(const char *path)
+{
+	if(*path == '/')
+		path++;
+
+	return !*path || strcmp(path, ".") || strcmp(path, "..");
+}
+
 #pragma endregion
 
 int tagfs_readdir(const char *_path, void *buf, fuse_fill_dir_t filler, UNUSED off_t offset, UNUSED struct fuse_file_info *fi)

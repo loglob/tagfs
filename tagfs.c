@@ -9,6 +9,8 @@
 #include <libexplain/fopen.h>
 #include <libexplain/fstat.h>
 #include <libexplain/fdopen.h>
+#include <libexplain/read.h>
+#include <libexplain/write.h>
 
 const char *usage = 
 	"Proper usage:\n"
@@ -34,31 +36,21 @@ static struct fuse_operations op =
 };
 
 /* Makes sure the loaded tagdb is valid and obeys all asserts.
-	Returns true if the tagdb is clean, false and prints warnings, or exits immediatly on fatal error. */
-bool tagfs_chk(tagfs_context_t *context)
+	Returns 0 if the tdb is clean, 1 on recoverable error and -1 on irrecoverable error. */
+int tagfs_chk(tagfs_context_t *context)
 {
-	bool chk = true;
-	#define ERR(...) { fprintf(stderr, "Tagdb invalid; " __VA_ARGS__); chk = false; continue; }
-
+	int err = 0;
+	#define IERR(...) { fprintf(stderr, "Tagdb invalid; " __VA_ARGS__); err = -1; continue; }
 
 	TDB_FORALL(context->tdb, name, entry,{
 		if(name[0] == TAGFS_NEG_CHAR)
-			ERR("Entry name '%s' may not start with '%c' as it is reserved for negating tags\n", name, TAGFS_NEG_CHAR)
+			IERR("Entry name '%s' may not start with '%c' as it is reserved for negating tags\n", name, TAGFS_NEG_CHAR)
+		if(name[0] == '.' && tdb_get(context->tdb, name + 1))
+			IERR("Entry name '%s' conflicts with entry '%s'\n", name, name)
 		if(strchr(name, '/'))
-			ERR("Entry name '%s' may not contain '/'\n", name);
-
-		bool exists = !faccessat(context->dirfd, name, F_OK, AT_SYMLINK_NOFOLLOW);
-
-		if(entry->kind == TDB_FILE_ENTRY)
-		{
-			if(!exists)
-				ERR("No file for entry '%s': %s\n", name, strerror(errno))
-		}
-		else
-		{
-			if(exists)
-				ERR("Tag '%s' conflicts with existing file\n", name)
-		}
+			IERR("Entry name '%s' may not contain '/'\n", name)
+		if(entry->kind == TDB_TAG_ENTRY && !faccessat(context->dirfd, name, F_OK, AT_SYMLINK_NOFOLLOW))
+			IERR("Tag '%s' conflicts with existing file\n", name)
 	})
 
 	struct dirent *ent;
@@ -66,18 +58,37 @@ bool tagfs_chk(tagfs_context_t *context)
 	// iterate over existing real files
 	while((ent = readdir(context->dir)))
 	{
+		if(specialDir(ent->d_name))
+			continue;
 		if(ent->d_name[0] == TAGFS_NEG_CHAR)
-			ERR("Real file '%s' may not start with '%c' as it is reserved for negating tags\n", ent->d_name, TAGFS_NEG_CHAR)
+			IERR("Real file '%s' may not start with '%c' as it is reserved for negating tags\n", ent->d_name, TAGFS_NEG_CHAR)
 		if(ent->d_name[0] == '.' && tdb_get(context->tdb, ent->d_name + 1))
-			ERR("Real file '%s' conflicts with tag '%s'\n", ent->d_name, ent->d_name + 1);
+			IERR("Real file '%s' conflicts with tag '%s'\n", ent->d_name, ent->d_name + 1);
 		if(ent->d_type == DT_DIR)
-			ERR("Real file '%s' may not be a directory", ent->d_name);
+			IERR("Real file '%s' may not be a directory", ent->d_name);
 	}
+
+	if(err)
+		return err;
+
+	// seek and remove nonexistant files
+	rerun:
+	TDB_FORALL(context->tdb, name, entry,{
+		if(entry->kind == TDB_FILE_ENTRY && faccessat(context->dirfd, name, F_OK, AT_SYMLINK_NOFOLLOW))
+		{
+			fprintf(stderr, "No file for entry '%s': %s\nRemoving bad entry from TDB\n", name, strerror(errno));
+			tdb_rmE(context->tdb, entry);
+			err = 1;
+			// the indices used by TDB_FORALL are no longer valid after hashmap update
+			goto rerun;
+		}
+	})
+
 
 	rewinddir(context->dir);
 
-	return chk;
-	#undef ERR
+	return err;
+	#undef IERR
 }
 
 #define printdie(...) printf(__VA_ARGS__), exit(EXIT_FAILURE)
@@ -130,8 +141,43 @@ int main(int argc, char **argv)
 		goto fail;
 
 	// final check of the tagdb and real directory
-	if(!tagfs_chk(context))
+	int chk = tagfs_chk(context);
+	
+	if(chk == -1)
 		goto fail;
+	if(chk == 1)
+	{
+		char bakfile[400];
+		time_t nowt;
+		time(&nowt);
+		struct tm now;
+		localtime_r(&nowt, &now);
+		int tries = 0;
+
+		do
+		{
+			snprintf(bakfile, 400, tries ? ".tagdb.%04u-%02u-%02u (%u)" : ".tagdb.%04u-%02u-%02u",
+				1900 + now.tm_year, 1+ now.tm_mon, now.tm_mday, tries);
+			tries++;
+		} while (!faccessat(context->dirfd, bakfile, F_OK, AT_SYMLINK_NOFOLLOW));
+		
+		printf("Creating backup of tagdb in '%s'\n", bakfile);
+		int bakfd = explain_openat_or_die(context->dirfd, bakfile, O_WRONLY | O_CREAT | O_TRUNC, S_IWGRP | S_IWUSR | S_IRGRP | S_IRUSR | S_IROTH);
+		int tdbfd = explain_openat_or_die(context->dirfd, ".tagdb", O_RDONLY, 0);
+
+		for(;;)
+		{
+			char buf[4096];
+			ssize_t r = explain_read_or_die(tdbfd, buf, sizeof(buf));
+			explain_write_or_die(bakfd, buf, r);
+
+			if(r < sizeof(buf))
+				break;
+		}
+
+		close(bakfd);
+		close(tdbfd);
+	}
 
 	fprintf(stderr, "Mounting at '%s'\n", *argv);
 
