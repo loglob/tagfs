@@ -15,11 +15,11 @@ remount: umount mount
 
 mount: tagfs-debug
 	ulimit -c unlimited
-	./tagfs-debug -l log dir -o nonempty
+	./tagfs-debug -l log dir
 
 grind: tagfs-debug
 	ulimit -c unlimited
-	valgrind --leak-check=full ./tagfs-debug -l log dir -o nonempty
+	valgrind --leak-check=full ./tagfs-debug -l log dir
 
 gremount: umount grind
 

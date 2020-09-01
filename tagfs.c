@@ -123,7 +123,18 @@ int main(int argc, char **argv)
 
 	fprintf(stderr, "Mounting at '%s'\n", *argv);
 
-	fuse_main(argc + 1, argv - 1, &op, context);
+	char **fuseopts = explain_malloc_or_die((argc + 4) * sizeof(char*));
+
+	fuseopts[0] = "tagfs";
+	fuseopts[1] = *argv;
+	fuseopts[2] = "-o";
+	fuseopts[3] = "nonempty";
+	fuseopts[argc+3] = NULL;
+
+	for (int i = 1; i < argc; i++)
+		fuseopts[i + 3] = argv[i];
+
+	fuse_main(argc + 3, fuseopts, &op, context);
 
 	fail:
 	if(context)
