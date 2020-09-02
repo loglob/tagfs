@@ -29,7 +29,7 @@ umount:
 	fusermount -u dir
 
 %_test.o: %_test.h test.c test.h %.h
-	$(CC) -include $< test.c -o $@ ${CFLAGS}
+	$(CC) -g -DDEBUG -DTRACE -include "$<" test.c -o "$@" ${CFLAGS}
 
 %_test: %_test.o
 	./$^

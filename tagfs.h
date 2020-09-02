@@ -22,6 +22,8 @@
 #include <time.h>
 #include <assert.h>
 
+#pragma region Macros
+
 #define CONTEXT ((tagfs_context_t*)fuse_get_context()->private_data)
 #define TDB (CONTEXT->tdb)
 #define TAGFS_NEG_CHAR '-'
@@ -33,6 +35,10 @@
 #else
 #define dbprintf(...) ;
 #endif
+
+#pragma endregion
+
+#pragma region Types
 
 typedef struct
 {
@@ -67,6 +73,8 @@ enum tagfs_flags
 	// If TFS_TAG is specified, check for tags prefixed with '-'
 	TFS_CHKNEG = 32,
 };
+
+#pragma endregion
 
 #pragma region Internal Functions
 
@@ -354,6 +362,8 @@ inline static bool tagfs_exists(const char *entry)
 
 
 #pragma endregion
+
+#pragma region Implementation
 
 int tagfs_readdir(const char *_path, void *buf, fuse_fill_dir_t filler, UNUSED off_t offset, UNUSED struct fuse_file_info *fi)
 {
@@ -767,3 +777,5 @@ void tagfs_destroy(void *_context)
 //	tdb_destroy(c->tdb);
 //	free(c);
 }
+
+#pragma endregion
