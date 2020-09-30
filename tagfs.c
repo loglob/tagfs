@@ -33,6 +33,7 @@ static struct fuse_operations op =
 	.unlink = tagfs_unlink,
 	.rmdir = tagfs_rmdir,
 	.rename = tagfs_rename,
+	.release = tagfs_release,
 };
 
 /* Makes sure the loaded tagdb is valid and obeys all asserts.

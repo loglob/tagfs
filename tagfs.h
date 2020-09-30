@@ -605,6 +605,13 @@ int tagfs_open(const char *path, struct fuse_file_info *ffi)
 	return 0;
 }
 
+int tagfs_release(const char *path, struct fuse_file_info *ffi)
+{
+	dbprintf("RELEASE: %s\n", path);
+	close(ffi->fh);
+	return 0;
+}
+
 int tagfs_read(UNUSED const char *path, char *buf, size_t len, off_t offset, struct fuse_file_info *ffi)
 {
 	return pread(ffi->fh, buf, len, offset);
