@@ -83,7 +83,7 @@ bool specialDir(const char *path)
 	if(*path == '/')
 		path++;
 
-	return !*path || strcmp(path, ".") || strcmp(path, "..");
+	return !*path || !strcmp(path, ".") || !strcmp(path, "..");
 }
 
 bool tdbFile(const char *path)
@@ -471,19 +471,19 @@ int tagfs_getattr(const char *path, struct stat *_stat)
 		case TDB_TAG_ENTRY:
 			// TODO: proper access times
 			gotRoot:
-//			dbprintf("GETATTR found tag\n");
+			dbprintf("GETATTR found tag\n");
 			*_stat = context->realStat;
 
 			return 0;
 		break;
 
 		case TDB_FILE_ENTRY:
-//			dbprintf("GETATTR found file\n");
+			dbprintf("GETATTR found file\n");
 			fstatat(CONTEXT->dirfd, fname, _stat, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
 		break;
 	}
 
-//	dbprintf("GETATTR exits with %d (%s)\n", errno, strerror(errno));
+	dbprintf("GETATTR exits with %d (%s)\n", errno, strerror(errno));
 
 	return -errno;
 }
@@ -761,6 +761,7 @@ void *tagfs_init(struct fuse_conn_info *conn)
 	}
 
 	lprintf("tagfs started at %s\nFuse protovol V%u.%u\n", tbuf, conn->proto_major, conn->proto_minor);
+	dbprintf("Debugging printouts enabled.\n");
 	lflush();
 
 	return CONTEXT;
@@ -770,8 +771,12 @@ void tagfs_destroy(void *_context)
 {
 	tagfs_context_t *c = (tagfs_context_t*)_context;
 
+	fprintf(c->log, "tagfs exiting.\n");
+
 	tdb_flush(c->tdb, c->log);
 	fflush(c->log);
+
+
 //	fclose(c->log);
 //	closedir(c->dir);
 //	tdb_destroy(c->tdb);
