@@ -443,6 +443,22 @@ int tagfs_readdir(const char *_path, void *buf, fuse_fill_dir_t filler, UNUSED o
 			if(f)
 				ERR(ENOMEM)
 		}
+
+		#ifdef LIST_NEGATED_TAGS
+		size_t nl = strlen(name);
+		char *nname = malloc(nl + 2);
+
+		if(!nname)
+			goto err;
+
+		*nname = '-';
+		memcpy(nname + 1, name, nl + 1);
+		int f = filler(buf, nname, NULL, 0);
+		free(nname);
+		
+		if(f)
+			ERR(ENOMEM)
+		#endif
 	})
 
 	err:
