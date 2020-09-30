@@ -455,7 +455,7 @@ int tagfs_readdir(const char *_path, void *buf, fuse_fill_dir_t filler, UNUSED o
 		memcpy(nname + 1, name, nl + 1);
 		int f = filler(buf, nname, NULL, 0);
 		free(nname);
-		
+
 		if(f)
 			ERR(ENOMEM)
 		#endif
@@ -603,6 +603,8 @@ int tagfs_utimens(const char *_path, const struct timespec tv[2])
 
 int tagfs_open(const char *path, struct fuse_file_info *ffi)
 {
+	dbprintf("OPEN: %s\n", path);
+
 	errno = 0;
 	const char *fname;
 	tagdb_entrykind_t kind = tagfs_resolve(path, NULL, &fname);
@@ -636,6 +638,16 @@ int tagfs_read(UNUSED const char *path, char *buf, size_t len, off_t offset, str
 int tagfs_write(UNUSED const char *_path, const char *buf, size_t len, off_t offset, struct fuse_file_info *ffi)
 {
 	return pwrite(ffi->fh, buf, len, offset);
+}
+
+int tagfs_fsync(const char *path, int datasync, struct fuse_file_info *ffi)
+{
+	dbprintf("FSYNC: %s\n", path);
+
+	if((datasync ? fdatasync : fsync)(ffi->fh))
+		return -errno;
+
+	return 0;
 }
 
 int tagfs_truncate(const char *_path, off_t len)

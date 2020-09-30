@@ -34,6 +34,7 @@ static struct fuse_operations op =
 	.rmdir = tagfs_rmdir,
 	.rename = tagfs_rename,
 	.release = tagfs_release,
+	.fsync = tagfs_fsync,
 };
 
 /* Makes sure the loaded tagdb is valid and obeys all asserts.
