@@ -8,7 +8,7 @@ DEFS := -DRELATIVE_RENAME -DLIST_NEGATED_TAGS
 tagfs-debug: tagfs.c tagfs.h tagdb.h hashmap.h bitarr.h futil.h
 	$(CC) -g $(DEFS) -DMALLOC_CHECK_ -DDEBUG -DTRACE "$<" ${CFLAGS} -lfuse -o "$@"
 
-tagfs: tagfs.c tagdb.h hashmap.h bitarr.h futil.h
+tagfs: tagfs.c tagfs.h tagdb.h hashmap.h bitarr.h futil.h
 	$(CC) $(DEFS) "$<" -o "$@" -lfuse ${CFLAGS}
 
 remount: umount mount
