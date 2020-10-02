@@ -116,9 +116,8 @@ void tdb_entry_set(tagdb_entry_t *fileEntry, size_t tagId, bool value);
 	Declares entry as tagdb_entry_t* to the current tag.
 	Continue and break work as expected. */
 #define TDB_FILE_FORALL(tdb, file, tagname, tag, body) TDB_FORALL(tdb, tagname, tag, { \
-	if(tag->kind != TDB_TAG_ENTRY || !tdb_entry_get(file, tag)) \
-		continue; \
-	body \
+	if(tag->kind == TDB_TAG_ENTRY && bitarr_get(file->fileTags, tag->tagId)) \
+		body \
 })
 
 /* Iterates over all files marked with the given tag.
@@ -128,9 +127,8 @@ void tdb_entry_set(tagdb_entry_t *fileEntry, size_t tagId, bool value);
 	Declares entry as tagdb_entry_t* to the current file.
 	Continue and break work as expected. */
 #define TDB_TAG_FORALL(tdb, tag, filename, file, body) TDB_FORALL(tdb, filename, file, { \
-	if(file->kind != TDB_FILE_ENTRY || !bitarr_get(file->fileTags, tag->tagId)) \
-		continue; \
-	body \
+	if(file->kind == TDB_FILE_ENTRY && bitarr_get(file->fileTags, tag->tagId)) \
+		body \
 })
 
 /* Asserts that an entry is valid */
