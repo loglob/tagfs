@@ -98,11 +98,14 @@ hmap_t hmap_new();
 		valueVar = &((map)->entries[index].data); \
 		keyVar = (map)->entries[index].key; \
 		if((map)->entries[index].key) \
-			{body} \
+			body \
 	} \
 
+#define _CC(a,b) a ## b
+#define CC(a,b) _CC(a,b)
+
 /* Iterates over all elements in the map using the given variable declarations and loop body. */
-#define HMAP_FORALL(map, keyVar, valueVar, body) _HMAP_FORALL_I(map, keyVar, valueVar, body, __ind_ ## __COUNTER__)
+#define HMAP_FORALL(map, keyVar, valueVar, body) _HMAP_FORALL_I(map, keyVar, valueVar, body, CC(__ind_, __COUNTER__))
 
 #pragma endregion
 
