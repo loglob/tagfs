@@ -35,6 +35,9 @@ static struct fuse_operations op =
 	.rename = tagfs_rename,
 	.release = tagfs_release,
 	.fsync = tagfs_fsync,
+	.getxattr = tagfs_getxattr,
+	.setxattr = tagfs_setxattr,
+	.listxattr = tagfs_listxattr,
 };
 
 /* Makes sure the loaded tagdb is valid and obeys all asserts.
@@ -170,7 +173,7 @@ int main(int argc, char **argv)
 		for(;;)
 		{
 			char buf[4096];
-			ssize_t r = explain_read_or_die(tdbfd, buf, sizeof(buf));
+			size_t r = explain_read_or_die(tdbfd, buf, sizeof(buf));
 			explain_write_or_die(bakfd, buf, r);
 
 			if(r < sizeof(buf))

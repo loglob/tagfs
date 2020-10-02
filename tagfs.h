@@ -21,8 +21,12 @@
 #include <dirent.h>
 #include <time.h>
 #include <assert.h>
+#include <sys/xattr.h>
 
 #pragma region Macros
+
+// Mark context as const so its cached when the CONTEXT macro is used a lot.
+extern struct fuse_context *fuse_get_context() __attribute__ ((const));
 
 #define CONTEXT ((tagfs_context_t*)fuse_get_context()->private_data)
 #define TDB (CONTEXT->tdb)
@@ -31,7 +35,7 @@
 #define lflush() fflush(CONTEXT->log)
 
 #ifdef DEBUG
-#define dbprintf(...) lprintf(__VA_ARGS__), lflush()
+#define dbprintf(...) (lprintf(__VA_ARGS__), lflush())
 #else
 #define dbprintf(...) ;
 #endif
@@ -78,7 +82,7 @@ enum tagfs_flags
 
 #pragma region Internal Functions
 
-bool specialDir(const char *path)
+bool __attribute__ ((const)) specialDir(const char *path)
 {
 	if(*path == '/')
 		path++;
@@ -86,7 +90,7 @@ bool specialDir(const char *path)
 	return !*path || !strcmp(path, ".") || !strcmp(path, "..");
 }
 
-bool tdbFile(const char *path)
+bool __attribute__ ((const)) tdbFile(const char *path)
 {
 	if(*path == '/')
 		path++;
@@ -478,25 +482,21 @@ int tagfs_getattr(const char *path, struct stat *_stat)
 	errno = 0;
 	tagfs_context_t *context = CONTEXT;
 	const char *fname;
-
-	if(path[0] == '/' && !path[1])
-		goto gotRoot;
-
+	
 	switch(tagfs_resolve(path, NULL, &fname))
 	{
 		case TDB_TAG_ENTRY:
 			// TODO: proper access times
-			gotRoot:
 			dbprintf("GETATTR found tag\n");
 			*_stat = context->realStat;
-
-			return 0;
 		break;
-
+		
 		case TDB_FILE_ENTRY:
 			dbprintf("GETATTR found file\n");
 			fstatat(CONTEXT->dirfd, fname, _stat, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
 		break;
+
+		default: break; 
 	}
 
 	dbprintf("GETATTR exits with %d (%s)\n", errno, strerror(errno));
@@ -623,7 +623,7 @@ int tagfs_open(const char *path, struct fuse_file_info *ffi)
 	return 0;
 }
 
-int tagfs_release(const char *path, struct fuse_file_info *ffi)
+int tagfs_release(UNUSED const char *path, struct fuse_file_info *ffi)
 {
 	dbprintf("RELEASE: %s\n", path);
 	close(ffi->fh);
@@ -640,7 +640,7 @@ int tagfs_write(UNUSED const char *_path, const char *buf, size_t len, off_t off
 	return pwrite(ffi->fh, buf, len, offset);
 }
 
-int tagfs_fsync(const char *path, int datasync, struct fuse_file_info *ffi)
+int tagfs_fsync(UNUSED const char *path, int datasync, struct fuse_file_info *ffi)
 {
 	dbprintf("FSYNC: %s\n", path);
 
@@ -648,6 +648,92 @@ int tagfs_fsync(const char *path, int datasync, struct fuse_file_info *ffi)
 		return -errno;
 
 	return 0;
+}
+
+int tagfs_getxattr(const char *path, const char *key, char *value, size_t size)
+{
+	dbprintf("GETXATTR: %s %s %zu\n", path, key, size);
+	tagdb_entry_t *e = NULL;
+
+	switch(tagfs_resolve(path, &e, NULL))
+	{
+		case TDB_TAG_ENTRY:;
+			ssize_t siz = fgetxattr(CONTEXT->dirfd, key, value, size);
+			dbprintf("getxattr on root dir: %d %s\n", errno, strerror(errno));
+		return (siz < 0) ? -errno : siz;
+
+		case TDB_FILE_ENTRY:
+			// TODO: wrap getxattr for real files (there is no getxattrat())
+			if(strcmp(key, "user.tags"))
+				return -ENODATA;
+			if(!e)
+				return 0;
+
+			size_t pos = 0;
+
+			TDB_FILE_FORALL(CONTEXT->tdb, e, tagname, tag, {
+				size_t len = strlen(tagname);
+
+				if(size)
+				{
+					if(pos+len >= size)
+						return -ERANGE;
+
+					memcpy(value + pos, tagname, len);
+					value[pos + len] = '/';
+				}
+
+				pos += len + 1;
+			})
+
+		return pos;
+
+		default:
+			return -errno;
+	}
+}
+
+int tagfs_setxattr(const char *path, const char *key, const char *value, size_t size, int flags)
+{
+	dbprintf("SETXATTR	%s	%s\n", path, key);
+
+	switch(tagfs_resolve(path, NULL, NULL))
+	{
+		case TDB_TAG_ENTRY:
+			return fsetxattr(CONTEXT->dirfd, key, value, size, flags) ? -errno : 0;
+
+		case TDB_FILE_ENTRY:
+			return -EOPNOTSUPP;
+
+		default:
+			return -errno;
+	}
+}
+
+int tagfs_listxattr(const char *path, char *buf, size_t len)
+{
+
+	switch(tagfs_resolve(path, NULL, NULL))
+	{
+		case TDB_TAG_ENTRY:;
+			int l = flistxattr(CONTEXT->dirfd, buf, len);
+		return (l == -1) ? -errno : l;
+
+		case TDB_FILE_ENTRY:;
+			const char aname[] = "user.tags";
+
+			if(len)
+			{
+				if(len < sizeof(aname))
+					return -ERANGE;
+					
+				memcpy(buf, aname, sizeof(aname));
+			}
+
+		return sizeof(aname);
+
+		default: return -errno;
+	}
 }
 
 int tagfs_truncate(const char *_path, off_t len)
