@@ -62,35 +62,45 @@ int testRand(hmap_t map)
 	const char alphabet[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	int data[sizeof(alphabet)];
 	bool has[sizeof(alphabet)] = {};
-	int lastop[sizeof(alphabet)] = {};
+	unsigned char lastop[sizeof(alphabet)] = {};
 	char key[] = "key_";
 
-	for (size_t j = 0; j < 2000; j++)
+	const char *ops[] = {
+		"put", "get", "ins",
+		"tryPut", "tryIns", "del",
+		"(none)"
+	};
+
+	// init lastops[] to (none)
+	memset(lastop, 6, sizeof(alphabet));
+
+	for (size_t j = 0; j < 20000; j++)
 	{
 		int i = rand() % sizeof(alphabet);
 		key[3] = alphabet[i];
-		int op;
+		int op = rand() % (sizeof(ops) / sizeof(*ops) - 1);
 		
-		const char *ops[] = {
-			"put", "get", "ins",
-			"tryPut", "tryIns", "del"
-		};
 
-		#define sfail() fail("%s failure for key %s after %s\n", ops[op], key, ops[lastop[op]])
-		#define mfail(msg) fail("%s failure for key %s after %s, %s\n", ops[op], key, ops[lastop[op]], msg)
-		#define eqchk(supposed, actual) { if(supposed != actual) { return fail("%s failure for key %s after %s: Expected %u, got %u\n", ops[op], key, ops[lastop[op]], supposed, actual); }}
-		#define eqpchk(supposed, actual) { if(supposed != actual) { return fail("%s failure for key %s after %s: Expected %p(%u), got %p(%u)\n", ops[op], key, ops[lastop[op]], supposed, *supposed, actual, *actual); } }
+		#define sfail() fail("%s failure for key %s after %s\n", ops[op], key, ops[lastop[i]])
+		#define mfail(msg) fail("%s failure for key %s after %s, %s\n", ops[op], key, ops[lastop[i]], msg)
+		#define eqchk(supposed, actual) { if(supposed != actual) { return fail("%s failure for key %s after %s: Expected %u, got %u\n", ops[op], key, ops[lastop[i]], supposed, actual); }}
+		#define eqpchk(supposed, actual) { if(supposed != actual) { return fail("%s failure for key %s after %s: Expected %p(%u), got %p(%u)\n", ops[op], key, ops[lastop[i]], supposed, *supposed, actual, *actual); } }
 		#define errfail() mfail(strerror(errno))
 
-		switch(op = rand() % (sizeof(ops) / sizeof(*ops)))
+		switch(op)
 		{
 			case 0:
 			{
-				data[i] = rand();
-				has[i] = true;
+				int d = rand();
+				int *v = hmap_put(map, key, d);
 
-				if(!hmap_put(map, key, data[i]))
+				if(!v)
 					return sfail();
+
+				eqchk(d, *v)
+
+				data[i] = d;
+				has[i] = true;
 			}
 			break;
 
@@ -113,19 +123,27 @@ int testRand(hmap_t map)
 				if(!d)
 					return errfail();
 
-				eqchk(has[i] ? data[i] : _d, *d)
-				if(!has[i]) data[i] = _d;
+				if(has[i])
+					eqchk(data[i], *d)
+				else
+				{
+					eqchk(_d, *d);
+					data[i] = _d;
+					has[i] = true;
+				}
 			}
 			break;
 
 			case 3:
 			{
-				int d = has[i] ? data[i] + 1 : (int)rand();
-				int *p;
+				int d = rand();
+				int *p = NULL;
 				int s = hmap_tryPut(map, key, d, &p); 
 
 				if(s < 0)
 					return errfail();
+				if(!p)
+					return mfail("returned NULL");
 
 				eqchk(!has[i], s);
 				eqchk(d, *p);
@@ -137,21 +155,24 @@ int testRand(hmap_t map)
 
 			case 4:
 			{
-				int d = has[i] ? data[i] + 1 : (int)rand();
+				int d = rand();
 				int *p;
 				int s = hmap_tryIns(map, key, d, &p); 
 				
 				if(s < 0)
 					return errfail();
+				if(!p)
+					return mfail("returned NULL");
 				
 				eqchk(!has[i], s)
-				eqchk(has[i] ? data[i] : d, *p)
-				
+				if(has[i])
+					eqchk(data[i], *p);
 				if(!has[i])
 				{
+					eqchk(d, *p)
 					data[i] = d;
 					has[i] = true;
-				}	
+				}
 			}
 			break;
 
@@ -166,6 +187,8 @@ int testRand(hmap_t map)
 			break;
 
 		}
+	
+		lastop[i] = op;
 	}
 	
 	HMAP_FORALL(map, const char *key, int *val, {
