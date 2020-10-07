@@ -233,7 +233,7 @@ static int _hmap_resize(hmap_t map, size_t newsize, struct hmap_entry e, struct 
 
 /* Attempts to insert a new entry into the map, possibly changing its size.
 	Copies the key to construct a hmap_entry object.
-	Returns the entry of the entry of the givne value and key.
+	Returns the new entry on success.
 	Returns NULL on malloc failure. */
 static struct hmap_entry *_hmap_ins(hmap_t map, HVAL_T data, struct hmap_digest hash, const char *_key)
 {
@@ -345,11 +345,6 @@ int hmap_tryPut(hmap_t map, const char *key, HVAL_T value, HVAL_T **p)
 {
 	struct hmap_digest hash = _hmap_hash(key);
 	struct hmap_entry *e = _hmap_get(map, hash, key);
-
-	if(e)
-		e->data = value;
-
-	return e ? 0 : _hmap_ins(map, value, hash, key) ? 1 : -1;
 
 	if(e)
 	{
