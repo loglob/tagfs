@@ -24,7 +24,7 @@ typedef word *bitarr_t;
 #pragma region Internal Functions
 static inline size_t _bitarr_size(size_t len)
 {
-	return (len / 64) + (len % 64) ? 1 : 0;
+	return (len / 64) + ((len % 64) ? 1 : 0);
 }
 #pragma endregion
 
@@ -71,12 +71,17 @@ void bitarr_copy(bitarr_t dest, size_t len, const bitarr_t src);
 bitarr_t bitarr_resize(bitarr_t arr, size_t oldLen, size_t newLen)
 {
 	size_t newSiz = _bitarr_size(newLen);
+	size_t oldSiz = _bitarr_size(oldLen);
+
+	if(oldSiz == newSiz)
+		return arr;
+
 	bitarr_t newArr = realloc(arr, newSiz * 8);
 
 	if(!newArr)
 		return NULL;
 
-	for (size_t i = _bitarr_size(oldLen); i < newSiz; i++)
+	for (size_t i = oldSiz; i < newSiz; i++)
 		newArr[i] = 0;
 	
 	return newArr;
