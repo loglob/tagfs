@@ -24,7 +24,7 @@ typedef word *bitarr_t;
 #pragma region Internal Functions
 static inline size_t _bitarr_size(size_t len)
 {
-	return (len / 64) + ((len % 64) ? 1 : 0);
+	return (len / WORD) + ((len % WORD) ? 1 : 0);
 }
 #pragma endregion
 
@@ -60,6 +60,8 @@ void bitarr_eqor(bitarr_t arr, size_t len, const bitarr_t r);
 bool bitarr_anyAnd(bitarr_t l, size_t len, bitarr_t r);
 /* Copies src to dest */
 void bitarr_copy(bitarr_t dest, size_t len, const bitarr_t src);
+/* Sets the first length bits in the array, starting at startIndex, to value. */
+void bitarr_fill(bitarr_t arr, size_t startIndex, size_t length, bool value);
 #pragma endregion
 
 #pragma region Macros
@@ -73,18 +75,13 @@ bitarr_t bitarr_resize(bitarr_t arr, size_t oldLen, size_t newLen)
 	size_t newSiz = _bitarr_size(newLen);
 	size_t oldSiz = _bitarr_size(oldLen);
 
-	if(oldSiz == newSiz)
-		return arr;
-
-	bitarr_t newArr = realloc(arr, newSiz * 8);
-
-	if(!newArr)
+	if(oldSiz != newSiz && !(arr = realloc(arr, newSiz * 8)))
 		return NULL;
 
-	for (size_t i = oldSiz; i < newSiz; i++)
-		newArr[i] = 0;
+	if(newLen > oldLen)
+		bitarr_fill(arr, oldLen, newLen - oldLen, false);
 	
-	return newArr;
+	return arr;
 }
 
 bitarr_t bitarr_new(size_t len)
@@ -94,15 +91,15 @@ bitarr_t bitarr_new(size_t len)
 
 bool bitarr_get(bitarr_t arr, size_t index)
 {
-	return (bool)(arr[index / 64] & (1 << (index % 64)));
+	return (bool)(arr[index / WORD] & (1 << (index % WORD)));
 }
 
 void bitarr_set(bitarr_t arr, size_t index, bool value)
 {
 	if(value)
-		arr[index / 64] |= (1 << (index % 64));
+		arr[index / WORD] |= (1 << (index % WORD));
 	else
-		arr[index / 64] &= ~(1 << (index % 64));
+		arr[index / WORD] &= ~(1 << (index % WORD));
 }
 
 void bitarr_destroy(bitarr_t arr)
@@ -112,8 +109,8 @@ void bitarr_destroy(bitarr_t arr)
 
 size_t bitarr_count(bitarr_t arr, size_t len, bool val)
 {
-	const word skip = val ? 0 : UINT64_MAX;
-	const word all = val ? UINT64_MAX : 0;
+	const word skip = val ? 0 : WORD_MAX;
+	const word all = val ? WORD_MAX : 0;
 	size_t siz = _bitarr_size(len);
 	size_t c = 0;
 
@@ -130,7 +127,7 @@ size_t bitarr_count(bitarr_t arr, size_t len, bool val)
 			continue;
 		}
 		
-		size_t wl = ((i + 1 == siz) && (len % 64)) ? (len % 64) : WORD;
+		size_t wl = ((i + 1 == siz) && (len % WORD)) ? (len % WORD) : WORD;
 
 		for (size_t j = 0; j < wl; j++)
 		{
@@ -147,7 +144,7 @@ size_t bitarr_count(bitarr_t arr, size_t len, bool val)
 size_t bitarr_next(const bitarr_t arr, size_t start, size_t len, bool val)
 {
 	size_t z = _bitarr_size(len);
-	word skip = val ? 0 : UINT64_MAX;
+	word skip = val ? 0 : WORD_MAX;
 	size_t p = start;
 
 	for (size_t w = start / WORD; w < z; w++)
@@ -266,12 +263,21 @@ void bitarr_merge(bitarr_t arr, size_t len, const bitarr_t pos, const bitarr_t n
 	}	
 }
 
-void bitarr_fill(bitarr_t arr, size_t len, bool value)
+void bitarr_fill(bitarr_t arr, size_t startIndex, size_t length, bool value)
 {
-	size_t z = _bitarr_size(len);
-	word fill = value ? WORD_MAX : 0;
+	// first partial word
+	if(startIndex % WORD)
+	{
+		if(value)
+			arr[startIndex / WORD] |= WORD_MAX << (startIndex % WORD);
+		else
+			arr[startIndex / WORD] &= WORD_MAX >> (WORD - (startIndex % WORD));
+	}
 
-	for (size_t w = 0; w < z; w++)
-		arr[w] = fill;
+	word fill = value ? WORD_MAX : 0;
+	size_t l = _bitarr_size(startIndex + length);
+
+	for (size_t i = _bitarr_size(startIndex); i < l; i++)
+		arr[i] = fill;
 }
 #pragma endregion

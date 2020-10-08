@@ -953,7 +953,7 @@ int tagfs_rename(const char *path, const char *npath)
 		{
 		#ifdef RELATIVE_RENAME	
 			if(bitarr_all(pos, tdb->tagCap, false) && bitarr_all(neg, tdb->tagCap, false))
-				bitarr_fill(e->fileTags, tdb->tagCap, false);
+				bitarr_fill(e->fileTags, 0, tdb->tagCap, false);
 			else
 				bitarr_merge(e->fileTags, tdb->tagCap, pos, neg);
 		#else
