@@ -7,13 +7,13 @@
 #define PARAM_T hmap_t
 #include "test.h"
 
-int testSimple(hmap_t map)
+void testSimple(hmap_t map)
 {
 	if(!map)
-		return failc(ENOMEM);
+		failc(ENOMEM);
 
 	HMAP_FORALL(map, const char *key, int *value, {
-		return fail("Empty map contains at least 1 element: %s->%u", key, *value);
+		fail("Empty map contains at least 1 element: %s->%u", key, *value);
 	})
 
 	char key[] = "key_";
@@ -30,7 +30,7 @@ int testSimple(hmap_t map)
 		//printf("Inserting %s->%zu\n", key, data[i]);
 
 		if(!hmap_ins(map, key, data[i]))
-			return fail("hmap_ins failure on key '%s'", key);
+			fail("hmap_ins failure on key '%s'", key);
 	}
 
 	/*
@@ -44,20 +44,18 @@ int testSimple(hmap_t map)
 		int *d;
 		
 		if(!(d = hmap_get(map, key)))
-			return fail("hmap_get failure on key '%s'; Entry not found!\n", key);
+			fail("hmap_get failure on key '%s': Entry not found!\n", key);
 		
 
 		if(*d != data[i])
-			return fail("hmap_get failure on key '%s'; Expected %u, got %u.\n", key, data[i], *d);
+			fail("hmap_get failure on key '%s': Expected %u, got %u.\n", key, data[i], *d);
 	}
-	
-	return 0;
 }
 
-int testRand(hmap_t map)
+void testRand(hmap_t map)
 {
 	if(!map)
-		return failc(ENOMEM);
+		failc(ENOMEM);
 
 	const char alphabet[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	int data[sizeof(alphabet)];
@@ -83,8 +81,8 @@ int testRand(hmap_t map)
 
 		#define sfail() fail("%s failure for key %s after %s\n", ops[op], key, ops[lastop[i]])
 		#define mfail(msg) fail("%s failure for key %s after %s, %s\n", ops[op], key, ops[lastop[i]], msg)
-		#define eqchk(supposed, actual) { if(supposed != actual) { return fail("%s failure for key %s after %s: Expected %u, got %u\n", ops[op], key, ops[lastop[i]], supposed, actual); }}
-		#define eqpchk(supposed, actual) { if(supposed != actual) { return fail("%s failure for key %s after %s: Expected %p(%u), got %p(%u)\n", ops[op], key, ops[lastop[i]], supposed, *supposed, actual, *actual); } }
+		#define eqchk(supposed, actual) { if(supposed != actual) fail("%s failure for key %s after %s: Expected %u, got %u\n", ops[op], key, ops[lastop[i]], supposed, actual); }
+		#define eqpchk(supposed, actual) { if(supposed != actual) fail("%s failure for key %s after %s: Expected %p(%u), got %p(%u)\n", ops[op], key, ops[lastop[i]], supposed, *supposed, actual, *actual); }
 		#define errfail() mfail(strerror(errno))
 
 		switch(op)
@@ -95,7 +93,7 @@ int testRand(hmap_t map)
 				int *v = hmap_put(map, key, d);
 
 				if(!v)
-					return sfail();
+					sfail();
 
 				eqchk(d, *v)
 
@@ -109,7 +107,7 @@ int testRand(hmap_t map)
 				int *d = hmap_get(map, key);
 				
 				if(has[i] != (bool)d)
-					return mfail(has[i] ? "exptected a value" : "expected null");
+					mfail(has[i] ? "exptected a value" : "expected null");
 				if(has[i])
 					eqchk(data[i], *d)
 			}
@@ -121,7 +119,7 @@ int testRand(hmap_t map)
 				int *d = hmap_ins(map, key, _d);
 				
 				if(!d)
-					return errfail();
+					errfail();
 
 				if(has[i])
 					eqchk(data[i], *d)
@@ -141,9 +139,9 @@ int testRand(hmap_t map)
 				int s = hmap_tryPut(map, key, d, &p); 
 
 				if(s < 0)
-					return errfail();
+					errfail();
 				if(!p)
-					return mfail("returned NULL");
+					mfail("returned NULL");
 
 				eqchk(!has[i], s);
 				eqchk(d, *p);
@@ -160,9 +158,9 @@ int testRand(hmap_t map)
 				int s = hmap_tryIns(map, key, d, &p); 
 				
 				if(s < 0)
-					return errfail();
+					errfail();
 				if(!p)
-					return mfail("returned NULL");
+					mfail("returned NULL");
 				
 				eqchk(!has[i], s)
 				if(has[i])
@@ -197,16 +195,14 @@ int testRand(hmap_t map)
 		int *d;
 
 		if(!has[i])
-			return fail("Got value for key %s which shouldn't exist\n", key);
+			fail("Got value for key %s which shouldn't exist\n", key);
 		if(*val != data[i])
-			return fail("Invalid value for key %s, expected %u, got %u.\n", key, data[i], *val);
+			fail("Invalid value for key %s, expected %u, got %u.\n", key, data[i], *val);
 		if(!(d = hmap_get(map, key)))
-			return fail("tryGet failure for key %s, expected 1; Entry is listed by HMAP_FORALL\n", key);
+			fail("tryGet failure for key %s, expected 1; Entry is listed by HMAP_FORALL\n", key);
 		if(d != val)
-			return fail("tryGet value for key %s inconsistend with HMAP_FORALL: Got %p(%u), expected %p(%u).\n", key, d,*d, val,*val);
+			fail("tryGet value for key %s inconsistend with HMAP_FORALL: Got %p(%u), expected %p(%u).\n", key, d,*d, val,*val);
 	})
-
-	return 0;
 }
 
 const test_t tests[] = {  };

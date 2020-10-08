@@ -1,7 +1,9 @@
-#define _POSIX_C_SOURCE 200809L
-//#include "hashmap_test.h"
-#include <stdlib.h>
+/* The makefile calls cc so that the effective first line is of the form
+#include "*_test.h"
+And includes the relevant test header and test.h */
+#include "test.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 
 #define UNUSED __attribute__ ((unused))
@@ -33,19 +35,15 @@ int main(UNUSED int argc, UNUSED char **argv)
 
 	for (size_t i = 0; i < t; i++)
 	{
-		size_t num = i + 1;
-		int c = tests[i]();
-
-		if(c)
-		{
-			printf("Failed test #%zu with code %u\n", num, c);
-			fail = c;
-		}
-		else
-			printf("Finished test %zu/%zu\n", num, total);
+		// from test.h
+		testInfo.testNumber = i + 1;
+		
+		tests[i]();
+		printf("Finished test %zu/%zu\n", i + 1, total);
 	}
 	
 	#ifdef PARAM_T
+
 	for (size_t i = 0; i < pt; i++)
 	{
 		size_t num = i + t + 1;
@@ -53,16 +51,18 @@ int main(UNUSED int argc, UNUSED char **argv)
 		for (size_t j = 0; j < fc; j++)
 		{
 			PARAM_T v = factories[j].create();
-			int c = ptests[i](v);
+
+			testInfo = (struct testInfo){
+				.testNumber = num,
+				.factoryNumber = j+1,
+				.factory = factories[j],
+				.value = v
+			};
+
+			ptests[i](v);
 			factories[j].destroy(v);
 
-			if(c)
-			{
-				printf("Failed test #%zu with factory %zu with code %u\n", num, j+1, c);
-				fail = c;
-			}
-			else
-				printf("Finished test %zu/%zu with factory %zu/%zu\n", num, total, j + 1, fc);
+			printf("Finished test %zu/%zu with factory %zu/%zu\n", num, total, j + 1, fc);
 
 		}
 		

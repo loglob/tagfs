@@ -6,7 +6,7 @@
 
 #define BASE_LEN 64
 
-int testnext1()
+void testnext1()
 {
 	word w = 0b1110111;
 
@@ -20,11 +20,10 @@ int testnext1()
 	next(8, 8)
 	next(16, -1)
 
-	return 0;
 	#undef next
 }
 
-int testnext2()
+void testnext2()
 {
 	word w = 0b000100010001000;
 
@@ -37,11 +36,10 @@ int testnext2()
 	next(7, 7)
 	next(8, 11)
 
-	return 0;
 	#undef next
 }
 
-int testnext3()
+void testnext3()
 {
 	word w = UINT64_MAX;
 
@@ -51,11 +49,10 @@ int testnext3()
 	next(0, -1)
 	next(10, -1)
 
-	return 0;
 	#undef next
 }
 
-int testResize()
+void testResize()
 {
 	bitarr_t arr = bitarr_new(BASE_LEN);
 	assertMsg(bitarr_count(arr, BASE_LEN, true) == 0, "newly allocated bitarray contains 1s\n");
@@ -69,10 +66,10 @@ int testResize()
 	assertMsg(arr, "bitarr_resize() growing failed: %s\n", strerror(errno));
 	assertMsg(bitarr_count(arr, BASE_LEN, true) == BASE_LEN / 2, "resized portion of bitarray contains 1s\n");
 
-	return EXIT_SUCCESS;
+	bitarr_destroy(arr);
 }
 
-int testSimple(bitarr_t arr)
+void testSimple(bitarr_t arr)
 {
 	assertMsg(bitarr_get(arr, 5) == 0, "init failure!")
 	bitarr_set(arr, 5, 0);
@@ -85,8 +82,6 @@ int testSimple(bitarr_t arr)
 
 	bitarr_set(arr, 5, 0);
 	assertMsg(bitarr_get(arr, 5) == 0, "set failure!")
-
-	return 0;
 }
 
 bitarr_t newBitarr()
