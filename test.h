@@ -22,8 +22,8 @@ extern const ptest_t ptests[];
 
 #define fail(...) failx(1, __VA_ARGS__)
 #define faile() failc(errno)
-#define failx(x, ...) (_eprintf(__VA_ARGS__), x)
-#define failc(x) (_eprintf("%s\n", strerror(x)), x)
+#define failx(x, ...) (fprintf(stderr, "Test %s failed at %s:%u: ", __func__, __FILE__, __LINE__), _eprintf(__VA_ARGS__), x)
+#define failc(x) (_eprintf("Test %s dailed at %s:%u: %s\n", __func__, __FILE__, __LINE__, strerror(x)), x)
 
 #define assertMsg(expr, ...) if(!(expr)) return fail(__VA_ARGS__);
 
