@@ -285,6 +285,7 @@ void tdb_destroy(tagdb_t *tdb)
 {
 	if(tdb)
 	{
+		fclose(tdb->file);
 		hmap_destroy(tdb->map);
 		bitarr_destroy(tdb->tagIds);
 		free(tdb);
