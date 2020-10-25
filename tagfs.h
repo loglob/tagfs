@@ -657,8 +657,15 @@ int tagfs_mkdir(const char *_path, mode_t mode)
 	tagdb_t *tdb = TDB;
 	const char *fname;
 
-	if((mode & 0777) != (CONTEXT->realStat.st_mode & 0777))
+	if((mode & CONTEXT->realStat.st_mode & 0777) != (mode & 0777))
+	{
+		int rm = CONTEXT->realStat.st_mode;
+		#define octal(n) ((n & 0700) >> 6), ((n & 070) >> 3), (n & 07)
+		dbprintf("Refusing mkdir() with mode %d%d%d, which is incompatible with root mode %d%d%d\n",
+											octal(mode),							octal(rm));
+		#undef octal
 		return -ENOTSUP;
+	}
 
 	tagfs_lock_w();
 
