@@ -628,25 +628,21 @@ int tagfs_mknod(const char *_path, mode_t mode, dev_t dev)
 		bitarr_copy(e->fileTags, tdb->tagCap, positive);
 		
 		err:
-		tagfs_release_w();
 		free(path);
 		free(positive);
 		free(negative);
 
 		if(errno)
-			return -errno;
+			RET_REL_W(-errno);
 	}
 	else
-	{
-		tagfs_release_w();
 		free(path);
-	}
-
 
 	errno = 0;
 	if(mknodat(CONTEXT->dirfd, fname, mode, dev) && e)
 		tdb_rmE(TDB, e);
 
+	tagfs_release_w();
 	return -errno;
 }
 
