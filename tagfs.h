@@ -857,13 +857,11 @@ int tagfs_truncate(const char *_path, off_t len)
 	if(fd == -1)
 		return -errno;
 
-	if(ftruncate(fd, len))
-	{
-		close(fd);
-		return -errno;
-	}
-
-	return 0;
+	errno = 0;
+	ftruncate(fd, len);
+	close(fd);
+	
+	return -errno;
 }
 
 int tagfs_unlink(const char *_path)
@@ -877,12 +875,9 @@ int tagfs_unlink(const char *_path)
 	if(!kind)
 		RET_REL_W(-errno);
 	if(entry)
-	{
 		tdb_rmE(TDB, entry);
-		tagfs_release_w();
-	}
-	else
-		tagfs_release_w();
+		
+	tagfs_release_w();
 
 	if((kind == TDB_FILE_ENTRY) && unlinkat(CONTEXT->dirfd, fname, 0))
 		return -errno;
@@ -903,14 +898,9 @@ int tagfs_rmdir(const char *_path)
 	if(kind != TDB_TAG_ENTRY)
 		RET_REL_W(-ENOTDIR);
 	if(entry)
-	{
 		tdb_rmE(TDB, entry);
-		tagfs_release_w();
-	}
-	else
-		tagfs_release_w();
-	
-
+		
+	tagfs_release_w();
 	return 0;
 }
 
@@ -964,7 +954,6 @@ int tagfs_rename(const char *path, const char *npath)
 		#endif
 		}
 	}
-	
 	
 	if(strcmp(nfname, ofname))
 	{
