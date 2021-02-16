@@ -374,6 +374,7 @@ tagdb_t *tdb_open(FILE *f)
 	err:
 	tdb_destroy(tdb);
 	return NULL;
+	#undef ERRPE
 }
 
 bool tdb_flush(tagdb_t *tdb, FILE *log)

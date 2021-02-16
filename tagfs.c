@@ -11,6 +11,7 @@
 #include <libexplain/fdopen.h>
 #include <libexplain/read.h>
 #include <libexplain/write.h>
+#include "explain_pthread_rwlock_init_or_die.h"
 
 const char *usage = 
 	"Proper usage:\n"
@@ -39,45 +40,6 @@ static struct fuse_operations op =
 	.setxattr = tagfs_setxattr,
 	.listxattr = tagfs_listxattr,
 };
-
-int explain_semget_or_die(key_t key, int nsems, int semflg)
-{
-	int s = semget(key, nsems, semflg);
-
-	if(s == -1)
-	{
-		fprintf(stderr, "semop: %s: ", strerror(errno));
-		struct seminfo i = {};
-		semctl(0, 0, IPC_INFO, &i);
-
-		switch(errno)
-		{
-			#define msg(err, str) case err: fprintf(stderr, "%s\n", str); break;
-			#define fmsg(err, ...) case err: fprintf(stderr, __VA_ARGS__); break;
-
-			msg(EACCES, "A semaphore set exists for key, but the calling process does not have permission to access the set, "
-				"and does not have the CAP_IPC_OWNER capability in the user namespace that governs its IPC namespace.")
-			fmsg(EEXIST, "A semaphore set already exists for key %d.\n", key);
-			
-			case EINVAL:
-				if(nsems < 0)
-					fprintf(stderr, "%s", "nsems is less than 0.");
-				else
-					fprintf(stderr, "nsems is greater than %u, the limit on the number of semaphores per semaphore set.\n", i.semmsl);
-			break;
-			
-			msg(ENOENT, "No semaphore set exists for key and semflg did not specify IPC_CREAT.")
-			msg(ENOMEM, "A semaphore set has to be created but the system does not have enough memory for the new data structure.")
-			
-			fmsg(ENOSPC, "A semaphore set has to be created but the system limit for the maximum number of semaphore sets (%u), "
-						"or the system wide maximum number of semaphores (%u), would be exceeded.\n", i.semmni, i.semmns)
-		}
-
-		exit(EXIT_FAILURE);
-	}
-
-	return s;
-}
 
 /* Makes sure the loaded tagdb is valid and obeys all asserts.
 	Returns 0 if the tdb is clean, 1 on recoverable error and -1 on irrecoverable error. */
@@ -172,14 +134,8 @@ int main(int argc, char **argv)
 		#undef push
 	}
 
-	// init semaphores
-	{
-		context->semaphores = explain_semget_or_die(IPC_PRIVATE, 3, IPC_CREAT | 0666);
-
-		// set wlock=1 and rlock=0
-		short v[] = {1,0};
-		semctl(context->semaphores, 2, SETALL, v);
-	}
+	// init lock
+	explain_pthread_rwlock_init_or_die(&context->lock, NULL);
 
 	// open the base directory
 	context->dir = explain_opendir_or_die(*argv);

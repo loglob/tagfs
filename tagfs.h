@@ -14,8 +14,7 @@
 
 #include "tagdb.h"
 #include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/sem.h>
+#include <pthread.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
@@ -36,6 +35,10 @@ extern struct fuse_context *fuse_get_context() __attribute__ ((const));
 #define TAGFS_NEG_CHAR '-'
 #define lprintf(...) fprintf(CONTEXT->log, __VA_ARGS__)
 #define lflush() fflush(CONTEXT->log)
+#define LOCK (&(CONTEXT->lock))
+#define lock_r() pthread_rwlock_rdlock(LOCK)
+#define lock_w() pthread_rwlock_wrlock(LOCK)
+#define unlock() pthread_rwlock_unlock(LOCK)
 
 #ifdef DEBUG
 #define dbprintf(...) (lprintf(__VA_ARGS__), lflush())
@@ -59,8 +62,8 @@ typedef struct
 	FILE *log;
 	/* The stat of the underlying real directory */
 	struct stat realStat;
-	/* A semaphore set of 2 semaphores, for Write- and Read-locking the tagdb. */
-	int semaphores;
+	/* The tagdb lock. */
+	pthread_rwlock_t lock;
 } tagfs_context_t;
 
 enum tagfs_flags
@@ -81,15 +84,6 @@ enum tagfs_flags
 	TFS_CHKALL = TFS_FILE | TFS_TAG | TFS_MKFILE | TFS_CHKDOT | TFS_NOCREAT,
 	// If TFS_TAG is specified, check for tags prefixed with '-'
 	TFS_CHKNEG = 32,
-};
-
-// The semaphore indices of the two semaphores used to coordinate tagdb access
-enum tagfs_sem
-{
-	/* this semaphore starts at 1 and, while it is zero, the program may not write to or read from the tagdb. */
-	TAGFS_WLOCK,
-	/* this semaphore starts at 0 and, while it is greater than zero, the program may not write to the tagdb. */
-	TAGFS_RLOCK
 };
 
 #pragma endregion
@@ -364,7 +358,7 @@ static tagdb_entrykind_t tagfs_resolve(const char *_path, tagdb_entry_t **_entry
 	#undef ERR
 }
 
-/* Determines if the givne entry name exists.
+/* Determines if the given entry name exists.
 	Sets errno to 0, regardless of output. */
 inline static bool tagfs_exists(const char *entry)
 {
@@ -377,68 +371,19 @@ inline static bool tagfs_exists(const char *entry)
 	return false;
 }
 
-#pragma region semaphore functions
-// locks TDB for reading
-static void tagfs_lock_r()
-{
-	// WLOCK is decremented since there is no way to wait until a value *could* be decremented without decrementing it 
-	struct sembuf get[] = {
-		{ .sem_num = TAGFS_RLOCK, .sem_op = +1 },
-		{ .sem_num = TAGFS_WLOCK, .sem_op = -1 },
-	};
+#pragma region rwlock functions
 
-	// it is assumed that semop will never fail
-	semop(CONTEXT->semaphores, get, 2);
-
-	struct sembuf relW[] = {
-		{ .sem_num = TAGFS_WLOCK, .sem_op = +1 },
-	};
-
-	semop(CONTEXT->semaphores, relW, 1);
-}
-
-// locks TDB for writing
-static void tagfs_lock_w()
-{
-	struct sembuf ops[] = {
-		{ .sem_num = TAGFS_WLOCK, .sem_op = -1 },
-		{ .sem_num = TAGFS_RLOCK, .sem_op = 0 },
-	};
-
-	semop(CONTEXT->semaphores, ops, sizeof(ops) / sizeof(*ops));
-}
-
-// releases writing lock
-static void tagfs_release_w()
-{
-	struct sembuf ops[] = {
-		{ .sem_num = TAGFS_WLOCK, .sem_op = +1 },
-	};
-
-	semop(CONTEXT->semaphores, ops, sizeof(ops) / sizeof(*ops));
-}
-
-// releases reading lock
-static void tagfs_release_r()
-{
-	struct sembuf ops[] = {
-		{ .sem_num = TAGFS_RLOCK, .sem_op = -1 },
-	};
-
-	semop(CONTEXT->semaphores, ops, sizeof(ops) / sizeof(*ops));
-}
-
-#define RET_REL_R(v) { tagfs_release_r(); return v; }
-#define RET_REL_W(v) { tagfs_release_w(); return v; }
-#define GOTO_REL_R(label) {tagfs_release_r(); goto label; }
-#define GOTO_REL_W(label) {tagfs_release_w(); goto label; }
+// Returns v after releasing lock.
+#define RET_REL(v) { unlock(); return v; }
+// Jumps to label after releasing lock
+#define GOTO_REL(label) { unlock(); goto label; }
 
 /* Exactly like tagfs_resolve() but acquires and releases read lock before/after resolving the path. */
 static tagdb_entrykind_t tagfs_resolveL(const char *_path, tagdb_entry_t **_entry, const char **_fname)
 {
-	tagfs_lock_r();
+	lock_r();
 	tagdb_entrykind_t k = tagfs_resolve(_path, _entry, _fname);
-	tagfs_release_r();
+	unlock();
 	
 	return k;
 }
@@ -458,7 +403,7 @@ int tagfs_readdir(const char *_path, void *buf, fuse_fill_dir_t filler, UNUSED o
 	tagdb_t *tdb = context->tdb;
 	char *path = strdup(_path);
 
-	tagfs_lock_r();
+	lock_r();
 
 	bitarr_t positive = bitarr_new(tdb->tagCap);
 	bitarr_t negative = bitarr_new(tdb->tagCap);
@@ -547,7 +492,7 @@ int tagfs_readdir(const char *_path, void *buf, fuse_fill_dir_t filler, UNUSED o
 	})
 
 	err:
-	tagfs_release_r();
+	unlock();
 
 	free(path);
 	free(positive);
@@ -598,12 +543,12 @@ int tagfs_mknod(const char *_path, mode_t mode, dev_t dev)
 	if(!path)
 		return -ENOMEM;
 
-	tagfs_lock_w();
+	lock_w();
 
 	if(tagfs_get(fname, TFS_CHKALL) || !errno || tdbFile(fname))
-		RET_REL_W(-EEXIST);
+		RET_REL(-EEXIST);
 	if(fname[0] == TAGFS_NEG_CHAR)
-		RET_REL_W(-EINVAL);
+		RET_REL(-EINVAL);
 	
 	tagdb_entry_t *e = NULL;
 
@@ -633,7 +578,7 @@ int tagfs_mknod(const char *_path, mode_t mode, dev_t dev)
 		free(negative);
 
 		if(errno)
-			RET_REL_W(-errno);
+			RET_REL(-errno);
 	}
 	else
 		free(path);
@@ -642,7 +587,7 @@ int tagfs_mknod(const char *_path, mode_t mode, dev_t dev)
 	if(mknodat(CONTEXT->dirfd, fname, mode, dev) && e)
 		tdb_rmE(TDB, e);
 
-	tagfs_release_w();
+	unlock();
 	return -errno;
 }
 
@@ -663,17 +608,17 @@ int tagfs_mkdir(const char *_path, mode_t mode)
 		return -ENOTSUP;
 	}
 
-	tagfs_lock_w();
+	lock_w();
 
 	if(!tagfs_validQuery(_path, &fname))
-		RET_REL_W(-errno);
+		RET_REL(-errno);
 	if(tagfs_get(fname, TFS_CHKALL) || !errno || tdbFile(fname) || specialDir(fname))
-		RET_REL_W(-EEXIST);
+		RET_REL(-EEXIST);
 	if(fname[0] == TAGFS_NEG_CHAR)
-		RET_REL_W(-EINVAL);
+		RET_REL(-EINVAL);
 		
 	tagdb_entry_t *newEntry = tdb_ins(tdb, fname, TDB_TAG_ENTRY);
-	tagfs_release_w();
+	unlock();
 	
 	return newEntry ? 0 : -errno;
 }
@@ -755,12 +700,12 @@ int tagfs_getxattr(const char *path, const char *key, char *value, size_t size)
 	dbprintf("GETXATTR: %s %s %zu\n", path, key, size);
 	tagdb_entry_t *e = NULL;
 
-	tagfs_lock_r();
+	lock_r();
 
 	switch(tagfs_resolve(path, &e, NULL))
 	{
 		case TDB_TAG_ENTRY:;
-			tagfs_release_r();
+			unlock();
 			ssize_t siz = fgetxattr(CONTEXT->dirfd, key, value, size);
 			dbprintf("getxattr on root dir: %d %s\n", errno, strerror(errno));
 		return (siz < 0) ? -errno : siz;
@@ -768,9 +713,9 @@ int tagfs_getxattr(const char *path, const char *key, char *value, size_t size)
 		case TDB_FILE_ENTRY:
 			// TODO: wrap getxattr for real files (there is no getxattrat())
 			if(strcmp(key, "user.tags"))
-				RET_REL_R(-ENODATA)
+				RET_REL(-ENODATA)
 			if(!e)
-				RET_REL_R(0)
+				RET_REL(0)
 
 			size_t pos = 0;
 
@@ -789,11 +734,11 @@ int tagfs_getxattr(const char *path, const char *key, char *value, size_t size)
 				pos += len + 1;
 			})
 
-			tagfs_release_r();
+			unlock();
 		return pos;
 
 		default:
-			tagfs_release_r();
+			unlock();
 		return -errno;
 	}
 }
@@ -869,15 +814,15 @@ int tagfs_unlink(const char *_path)
 	dbprintf("UNLINK: %s\n", _path);
 	tagdb_entry_t *entry = NULL;
 	const char *fname;
-	tagfs_lock_w();
+	lock_w();
 	tagdb_entrykind_t kind = tagfs_resolve(_path, &entry, &fname);
 
 	if(!kind)
-		RET_REL_W(-errno);
+		RET_REL(-errno);
 	if(entry)
 		tdb_rmE(TDB, entry);
 		
-	tagfs_release_w();
+	unlock();
 
 	if((kind == TDB_FILE_ENTRY) && unlinkat(CONTEXT->dirfd, fname, 0))
 		return -errno;
@@ -890,17 +835,17 @@ int tagfs_rmdir(const char *_path)
 	dbprintf("RMDIR: %s\n", _path);
 	tagdb_entry_t *entry = NULL;
 	const char *fname;
-	tagfs_lock_w();
+	lock_w();
 	tagdb_entrykind_t kind = tagfs_resolve(_path, &entry, &fname);
 
 	if(!kind)
-		RET_REL_W(-errno);
+		RET_REL(-errno);
 	if(kind != TDB_TAG_ENTRY)
-		RET_REL_W(-ENOTDIR);
+		RET_REL(-ENOTDIR);
 	if(entry)
 		tdb_rmE(TDB, entry);
 		
-	tagfs_release_w();
+	unlock();
 	return 0;
 }
 
@@ -912,7 +857,7 @@ int tagfs_rename(const char *path, const char *npath)
 	tagdb_entry_t *entry = NULL;
 	const char *ofname;
 
-	tagfs_lock_w();
+	lock_w();
 
 	tagdb_entrykind_t kind = tagfs_resolve(path, &entry, &ofname);
 	tagdb_t *tdb = TDB;
@@ -964,7 +909,7 @@ int tagfs_rename(const char *path, const char *npath)
 	}
 
 	err:
-	tagfs_release_w();
+	unlock();
 	free(query);
 	free(pos);
 	free(neg);
