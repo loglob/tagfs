@@ -12,7 +12,7 @@ void testnext1()
 
 	int v;
 	#define next(f, i) assertMsg((v = bitarr_next(&w, f, 16, false)) == i, "testnext 1: from %d: Got %d, expected %d\n", f, v, i)
-	
+
 	next(0, 3)
 	next(3, 3)
 	next(4, 7)
@@ -29,7 +29,7 @@ void testnext2()
 
 	int v;
 	#define next(f, i) assertMsg((v = bitarr_next(&w, f, 16, true)) == i, "testnext 2: from %d: Got %d, expected %d\n", f, v, i)
-	
+
 	next(0, 3)
 	next(3, 3)
 	next(4, 7)
@@ -45,7 +45,7 @@ void testnext3()
 
 	int v;
 	#define next(f, i) assertMsg((v = bitarr_next(&w, f, 16, false)) == i, "testnext 3: from %d: Got %d, expected %d\n", f, v, i)
-	
+
 	next(0, -1)
 	next(10, -1)
 

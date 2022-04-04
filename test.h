@@ -42,7 +42,7 @@ void testError(const char *func, const char *file, unsigned long line, const cha
 {
 	va_list va;
 	va_start(va, fmt);
-	
+
 #ifdef PARAM_T
 	if(testInfo.factoryNumber)
 	{

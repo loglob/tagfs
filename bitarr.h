@@ -11,7 +11,7 @@
 	#define WORD 64
 	#define WORD_MAX UINT64_MAX
 	#ifdef PRIu64
-	#define PRIW PRIu64 
+	#define PRIW PRIu64
 	#else
 	#define PRIW "ul"
 	#endif
@@ -80,7 +80,7 @@ bitarr_t bitarr_resize(bitarr_t arr, size_t oldLen, size_t newLen)
 
 	if(newLen > oldLen)
 		bitarr_fill(arr, oldLen, newLen - oldLen, false);
-	
+
 	return arr;
 }
 
@@ -126,7 +126,7 @@ size_t bitarr_count(bitarr_t arr, size_t len, bool val)
 			c += WORD;
 			continue;
 		}
-		
+
 		size_t wl = ((i + 1 == siz) && (len % WORD)) ? (len % WORD) : WORD;
 
 		for (size_t j = 0; j < wl; j++)
@@ -137,7 +137,7 @@ size_t bitarr_count(bitarr_t arr, size_t len, bool val)
 			cur >>= 1;
 		}
 	}
-	
+
 	return c;
 }
 
@@ -159,7 +159,7 @@ size_t bitarr_next(const bitarr_t arr, size_t start, size_t len, bool val)
 			cur >>= start % WORD;
 			start = 0;
 		}
-		
+
 		for (; p < len; cur >>= 1, p++)
 		{
 			if((cur & 1) == val)
@@ -214,7 +214,7 @@ bool bitarr_match(const bitarr_t arr, size_t len, const bitarr_t pos, const bita
 				return false;
 		}
 	}
-	
+
 	return true;
 }
 
@@ -222,7 +222,7 @@ void bitarr_eqor(bitarr_t arr, size_t len, const bitarr_t r)
 {
 	for (size_t w = 0; w < len / WORD; w++)
 		arr[w] |= r[w];
-	
+
 	// Handles last word
 	if(len % WORD)
 		arr[len/WORD] |= r[len/WORD] & (WORD_MAX >> (WORD - (len % WORD)));
@@ -235,7 +235,7 @@ bool bitarr_anyAnd(bitarr_t l, size_t len, bitarr_t r)
 		if(l[w] & r[w])
 			return true;
 	}
-	
+
 	// Handles last word
 	if(len % WORD && (l[len/WORD] & r[len/WORD] & (WORD_MAX >> (WORD - (len % WORD)))))
 		return true;
@@ -260,7 +260,7 @@ void bitarr_merge(bitarr_t arr, size_t len, const bitarr_t pos, const bitarr_t n
 	{
 		arr[w] |= pos[w];
 		arr[w] &= ~neg[w];
-	}	
+	}
 }
 
 void bitarr_fill(bitarr_t arr, size_t startIndex, size_t length, bool value)

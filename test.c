@@ -37,11 +37,11 @@ int main(UNUSED int argc, UNUSED char **argv)
 	{
 		// from test.h
 		testInfo.testNumber = i + 1;
-		
+
 		tests[i]();
 		printf("Finished test %zu/%zu\n", i + 1, total);
 	}
-	
+
 	#ifdef PARAM_T
 
 	for (size_t i = 0; i < pt; i++)
@@ -65,9 +65,9 @@ int main(UNUSED int argc, UNUSED char **argv)
 			printf("Finished test %zu/%zu with factory %zu/%zu\n", num, total, j + 1, fc);
 
 		}
-		
+
 	}
 	#endif
-	 
+
 	return fail;
 }

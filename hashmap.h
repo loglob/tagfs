@@ -139,7 +139,7 @@ static struct hmap_entry *_hmap_get(hmap_t map, struct hmap_digest hash, const c
 {
 	if(_hmap_matches(map->entries[hash.primary % map->len], hash, key))
 		return &map->entries[hash.primary % map->len];
-	
+
 	if(_hmap_matches(map->entries[hash.secondary % map->len], hash, key))
 		return &map->entries[hash.secondary % map->len];
 
@@ -184,7 +184,7 @@ static struct hmap_entry *_hmap_put(hmap_t map, struct hmap_entry e)
 	#define empty(i) if(!map->entries[i].key) insat(i)
 	#define cuckoo(i) if(_hmap_move(map, i, 0)) insat(i)
 	#define try(f) f(e.digest.primary % map->len) f(e.digest.secondary % map->len)
-	
+
 	try(empty)
 	try(cuckoo)
 
@@ -241,14 +241,14 @@ static struct hmap_entry *_hmap_ins(hmap_t map, HVAL_T data, struct hmap_digest 
 
 	if(!key)
 		return NULL;
-	
+
 	memcpy(key, _key, hash.keyLen + 1);
 	struct hmap_entry e = (struct hmap_entry){ .data = data, .key = key, .digest = hash };
 	struct hmap_entry *p = _hmap_put(map, e);
 
 	if(p)
 		return p;
-	
+
 	// naive resizing
 	for (int newsize = map->len * 2; ; newsize++)
 	{
@@ -297,7 +297,7 @@ HVAL_T *hmap_ins(hmap_t map, const char *_key, HVAL_T data)
 
 	if(ex) // Entry already exists
 		return &ex->data;
-	
+
 	ex = _hmap_ins(map, data, d, _key);
 
 	return ex ? &ex->data : NULL;
@@ -313,9 +313,9 @@ HVAL_T *hmap_put(hmap_t map, const char *_key, HVAL_T data)
 		ex->data = data;
 		return &ex->data;
 	}
-	
+
 	ex = _hmap_ins(map, data, d, _key);
-	
+
 	return ex ? &ex->data : NULL;
 }
 

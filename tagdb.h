@@ -24,7 +24,7 @@ typedef enum
 typedef struct
 {
 	tagdb_entrykind_t kind;
-	
+
 	union
 	{
 		// Only valid if kind==TDB_TAG_ENTRY, in 0..tagCap
@@ -144,7 +144,7 @@ void tdb_entry_set(tagdb_entry_t *fileEntry, size_t tagId, bool value);
 bool _tdb_mkentry(tagdb_t *tdb, tagdb_entry_t *e, tagdb_entrykind_t k)
 {
 	assert(k == TDB_FILE_ENTRY || k == TDB_TAG_ENTRY);
-	
+
 	if(k == TDB_FILE_ENTRY)
 	{
 		if(!(e->fileTags = bitarr_new(tdb->tagCap)))
@@ -157,13 +157,13 @@ bool _tdb_mkentry(tagdb_t *tdb, tagdb_entry_t *e, tagdb_entrykind_t k)
 		if(freeId == (size_t)-1)
 		{ // Need to expand every file entry's bitarray
 			size_t newCap = tdb->tagCap * 2;
-			
+
 			HMAP_FORALL(tdb->map, UNUSED const char *key, tagdb_entry_t *fe, {
 				if(fe->kind != TDB_FILE_ENTRY)
 					continue;
 
 				bitarr_t nb = bitarr_resize(fe->fileTags, tdb->tagCap, newCap);
-				
+
 				if(!nb)
 					return false;
 
@@ -361,10 +361,10 @@ tagdb_t *tdb_open(FILE *f)
 				fprintf(stderr, "Relationship %s->%s present twice - ignoring duplicate definition\n", tagName, fileName);
 			else
 				bitarr_set(file->fileTags, tagId, true);
-			
+
 			free(fileName);
 		}
-		
+
 		free(tagName);
 	} while(!feof(f));
 
@@ -387,11 +387,11 @@ bool tdb_flush(tagdb_t *tdb, FILE *log)
 			fprintf(log, "IO error: %s\n", strerror(errno)); \
 			s = false; \
 		}
-	
+
 	TDB_FORALL(tdb, tagname, tag, {
 		if(tag->kind != TDB_TAG_ENTRY)
 			continue;
-			
+
 		WRITE(tagname)
 
 		TDB_TAG_FORALL(tdb, tag, filename, file, {
@@ -403,7 +403,7 @@ bool tdb_flush(tagdb_t *tdb, FILE *log)
 
 	fflush(tdb->file);
 	rewind(tdb->file);
-	
+
 	return s;
 	#undef WRITE
 }

@@ -26,7 +26,7 @@ void testSimple(hmap_t map)
 		data[i] = rand();
 		//data[i] = i;
 		key[3] = alphabet[i];
-	
+
 		//printf("Inserting %s->%zu\n", key, data[i]);
 
 		if(!hmap_ins(map, key, data[i]))
@@ -37,15 +37,15 @@ void testSimple(hmap_t map)
 	HMAP_FORALL(map, const char *key, size_t value, {
 		printf("%s->%zu\n", key, value);
 	})*/
-	
+
 	for (size_t i = 0; i < sizeof(alphabet); i++)
 	{
 		key[3] = alphabet[i];
 		int *d;
-		
+
 		if(!(d = hmap_get(map, key)))
 			fail("hmap_get failure on key '%s': Entry not found!\n", key);
-		
+
 
 		if(*d != data[i])
 			fail("hmap_get failure on key '%s': Expected %u, got %u.\n", key, data[i], *d);
@@ -77,7 +77,7 @@ void testRand(hmap_t map)
 		int i = rand() % sizeof(alphabet);
 		key[3] = alphabet[i];
 		int op = rand() % (sizeof(ops) / sizeof(*ops) - 1);
-		
+
 
 		#define sfail() fail("%s failure for key %s after %s\n", ops[op], key, ops[lastop[i]])
 		#define mfail(msg) fail("%s failure for key %s after %s, %s\n", ops[op], key, ops[lastop[i]], msg)
@@ -105,7 +105,7 @@ void testRand(hmap_t map)
 			case 1:
 			{
 				int *d = hmap_get(map, key);
-				
+
 				if(has[i] != (bool)d)
 					mfail(has[i] ? "exptected a value" : "expected null");
 				if(has[i])
@@ -117,7 +117,7 @@ void testRand(hmap_t map)
 			{
 				int _d = rand();
 				int *d = hmap_ins(map, key, _d);
-				
+
 				if(!d)
 					errfail();
 
@@ -136,7 +136,7 @@ void testRand(hmap_t map)
 			{
 				int d = rand();
 				int *p = NULL;
-				int s = hmap_tryPut(map, key, d, &p); 
+				int s = hmap_tryPut(map, key, d, &p);
 
 				if(s < 0)
 					errfail();
@@ -145,7 +145,7 @@ void testRand(hmap_t map)
 
 				eqchk(!has[i], s);
 				eqchk(d, *p);
-				
+
 				data[i] = d;
 				has[i] = true;
 			}
@@ -155,13 +155,13 @@ void testRand(hmap_t map)
 			{
 				int d = rand();
 				int *p;
-				int s = hmap_tryIns(map, key, d, &p); 
-				
+				int s = hmap_tryIns(map, key, d, &p);
+
 				if(s < 0)
 					errfail();
 				if(!p)
 					mfail("returned NULL");
-				
+
 				eqchk(!has[i], s)
 				if(has[i])
 					eqchk(data[i], *p);
@@ -178,17 +178,17 @@ void testRand(hmap_t map)
 			{
 				int d = hmap_del(map, key);
 
-				eqchk(has[i], d);					
-				
+				eqchk(has[i], d);
+
 				has[i] = false;
 			}
 			break;
 
 		}
-	
+
 		lastop[i] = op;
 	}
-	
+
 	HMAP_FORALL(map, const char *key, int *val, {
 		char *_a = strchr(alphabet, key[3]);
 		int i = _a ? ((size_t)_a - (size_t)alphabet) : sizeof(alphabet) - 1;

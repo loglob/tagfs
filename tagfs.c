@@ -13,7 +13,7 @@
 #include <libexplain/write.h>
 #include "explain_pthread_rwlock_init_or_die.h"
 
-const char *usage = 
+const char *usage =
 	"Proper usage:\n"
 	"	tagfs [-l|--log <log file>] <mount point> [FUSE arguments...]\n"
 	"	tagfs [-q|--quiet] <mount point> [FUSE arguments...]\n";
@@ -107,12 +107,12 @@ int main(int argc, char **argv)
 	{
 		#define push() argc--,argv++
 		push();
-		
+
 		if(argc && (!strcmp("-l", *argv) || !strcmp("--log", *argv)))
 		{
 			if(argc < 2)
 				printdie("Invalid usage; missing logfile after %s\n%s", *argv, usage);
-			
+
 			push();
 			if(strcmp(*argv, "-"))
 				context->log = explain_fopen_or_die(*argv, "a");
@@ -144,7 +144,7 @@ int main(int argc, char **argv)
 
 	context->tdb = tdb_open(
 		explain_fdopen_or_die(
-			explain_openat_or_die(context->dirfd, ".tagdb", 
+			explain_openat_or_die(context->dirfd, ".tagdb",
 				O_RDWR | O_CREAT,
 				S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH),
 			"r+"));
@@ -154,7 +154,7 @@ int main(int argc, char **argv)
 
 	// final check of the tagdb and real directory
 	int chk = tagfs_chk(context);
-	
+
 	if(chk == -1)
 		goto fail;
 	if(chk == 1)
@@ -172,7 +172,7 @@ int main(int argc, char **argv)
 				1900 + now.tm_year, 1+ now.tm_mon, now.tm_mday, tries);
 			tries++;
 		} while (!faccessat(context->dirfd, bakfile, F_OK, AT_SYMLINK_NOFOLLOW));
-		
+
 		printf("Creating backup of tagdb in '%s'\n", bakfile);
 		int bakfd = explain_openat_or_die(context->dirfd, bakfile, O_WRONLY | O_CREAT | O_TRUNC, S_IWGRP | S_IWUSR | S_IRGRP | S_IRUSR | S_IROTH);
 		int tdbfd = explain_openat_or_die(context->dirfd, ".tagdb", O_RDONLY, 0);
@@ -211,7 +211,7 @@ int main(int argc, char **argv)
 	{
 		if(context->tdb)
 			tdb_destroy(context->tdb);
-	
+
 		if(context->dir)
 			closedir(context->dir);
 

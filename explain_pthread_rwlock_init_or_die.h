@@ -27,7 +27,7 @@ void explain_pthread_rwlock_init_or_die(pthread_rwlock_t *rwlock, pthread_rwlock
 			default:
 				fprintf(stderr, "Nonstandard error code %d returned.\n", err);
 		}
-		
+
 		exit(1);
 	}
 }
