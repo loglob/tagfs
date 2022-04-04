@@ -71,7 +71,7 @@ enum tagfs_flags
 	// Accepts file entries
 	TFS_FILE = 1,
 	// Accepts tag entries
-	TFS_TAG = 2, 
+	TFS_TAG = 2,
 	// Accepts files or tags
 	TFS_ANY = TFS_FILE | TFS_TAG,
 	// Checks for real files and creates an entry for them. Only valid if TFS_FILE is set.
@@ -193,10 +193,10 @@ static inline tagdb_entry_t *tagfs_get(const char *name, enum tagfs_flags flags)
 
 		if(flags & TFS_NOCREAT)
 			fail(0);
-		
+
 		return tdb_ins(CONTEXT->tdb, name, TDB_FILE_ENTRY);
 	}
-	
+
 	//dbprintf("GET fail\n");
 	fail(ENOENT);
 	#undef fail
@@ -211,7 +211,7 @@ static inline tagdb_entry_t *tagfs_get(const char *name, enum tagfs_flags flags)
 static bool tagfs_query(char *path, bitarr_t pos, bitarr_t neg)
 {
 	char *sav = NULL;
-	
+
 	for(char *tok = strtok_r(path, "/", &sav); tok; tok = strtok_r(NULL, "/", &sav))
 	{
 		bool mod = true;
@@ -221,7 +221,7 @@ static bool tagfs_query(char *path, bitarr_t pos, bitarr_t neg)
 			mod = false;
 			tok++;
 		}
-		
+
 		// Check for dot-prefixed tags only if the - prefix isn't used
 		tagdb_entry_t *e = tagfs_get(tok, TFS_TAG | (mod ? TFS_CHKDOT : 0));
 
@@ -304,9 +304,9 @@ static tagdb_entrykind_t tagfs_resolve(const char *_path, tagdb_entry_t **_entry
 
 		if(path && pos && neg)
 			tagfs_query(path, pos, neg);
-		
+
 		free(path);
-		
+
 		if(errno)
 		{
 			free(neg);
@@ -325,9 +325,9 @@ static tagdb_entrykind_t tagfs_resolve(const char *_path, tagdb_entry_t **_entry
 	if(tdbFile(fname))
 	{
 		errno = ENOENT;
-		return TDB_EMPTY_ENTRY;	
+		return TDB_EMPTY_ENTRY;
 	}
-	
+
 	tagdb_entry_t *entry = tagfs_get(fname, TFS_CHKALL | TFS_CHKNEG);
 
 	if(entry)
@@ -345,7 +345,7 @@ static tagdb_entrykind_t tagfs_resolve(const char *_path, tagdb_entry_t **_entry
 	else
 	{
 	//	dbprintf("Found existing file\n");
-		
+
 		if(pos && bitarr_any(pos, tdb->tagCap, true))
 			ERR(ENOENT)
 	}
@@ -384,7 +384,7 @@ static tagdb_entrykind_t tagfs_resolveL(const char *_path, tagdb_entry_t **_entr
 	lock_r();
 	tagdb_entrykind_t k = tagfs_resolve(_path, _entry, _fname);
 	unlock();
-	
+
 	return k;
 }
 
@@ -403,19 +403,20 @@ int tagfs_readdir(const char *_path, void *buf, fuse_fill_dir_t filler, UNUSED o
 	tagdb_t *tdb = context->tdb;
 	char *path = strdup(_path);
 
-	lock_r();
+	// use a write lock since we mutate context->dir
+	lock_w();
 
 	bitarr_t positive = bitarr_new(tdb->tagCap);
 	bitarr_t negative = bitarr_new(tdb->tagCap);
 	// Contains all tags that have at least one listed file
 	bitarr_t dirmask = bitarr_new(tdb->tagCap);
-	
+
 	if(!path || !positive || !negative || !dirmask)
 		ERR(ENOMEM)
 
 	if(!tagfs_query(path, positive, negative))
 		goto err;
-	
+
 	int anyP = bitarr_any(positive, tdb->tagCap, true);
 	struct dirent *ent;
 
@@ -425,7 +426,7 @@ int tagfs_readdir(const char *_path, void *buf, fuse_fill_dir_t filler, UNUSED o
 		// filter out the .tagdb file
 		if(tdbFile(ent->d_name))
 			continue;
-		
+
 		tagdb_entry_t *entry = tdb_get(tdb, ent->d_name);
 
 		if(entry)
@@ -442,7 +443,7 @@ int tagfs_readdir(const char *_path, void *buf, fuse_fill_dir_t filler, UNUSED o
 
 		struct stat s;
 		if(filler(buf, ent->d_name, fstatat(context->dirfd, ent->d_name, &s, AT_SYMLINK_NOFOLLOW) ? NULL : &s, 0))
-			ERR(ENOMEM)	
+			ERR(ENOMEM)
 	}
 
 	rewinddir(context->dir);
@@ -518,13 +519,13 @@ int tagfs_getattr(const char *path, struct stat *_stat)
 			dbprintf("GETATTR found tag\n");
 			*_stat = context->realStat;
 		break;
-		
+
 		case TDB_FILE_ENTRY:
 			dbprintf("GETATTR found file\n");
 			fstatat(CONTEXT->dirfd, fname, _stat, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
 		break;
 
-		default: break; 
+		default: break;
 	}
 
 	dbprintf("GETATTR exits with %d (%s)\n", errno, strerror(errno));
@@ -539,7 +540,7 @@ int tagfs_mknod(const char *_path, mode_t mode, dev_t dev)
 	tagdb_t *tdb = TDB;
 	const char *fname;
 	char *path = split(_path, &fname);
-	
+
 	if(!path)
 		return -ENOMEM;
 
@@ -549,7 +550,7 @@ int tagfs_mknod(const char *_path, mode_t mode, dev_t dev)
 		RET_REL(-EEXIST);
 	if(fname[0] == TAGFS_NEG_CHAR)
 		RET_REL(-EINVAL);
-	
+
 	tagdb_entry_t *e = NULL;
 
 	// given path contains a query
@@ -571,7 +572,7 @@ int tagfs_mknod(const char *_path, mode_t mode, dev_t dev)
 			goto err;
 
 		bitarr_copy(e->fileTags, tdb->tagCap, positive);
-		
+
 		err:
 		free(path);
 		free(positive);
@@ -616,10 +617,10 @@ int tagfs_mkdir(const char *_path, mode_t mode)
 		RET_REL(-EEXIST);
 	if(fname[0] == TAGFS_NEG_CHAR)
 		RET_REL(-EINVAL);
-		
+
 	tagdb_entry_t *newEntry = tdb_ins(tdb, fname, TDB_TAG_ENTRY);
 	unlock();
-	
+
 	return newEntry ? 0 : -errno;
 }
 
@@ -633,7 +634,7 @@ int tagfs_utimens(const char *_path, const struct timespec tv[2])
 
 	const char *fname;
 	tagdb_entrykind_t k = tagfs_resolveL(_path, NULL, &fname);
-	
+
 	if(k == TDB_FILE_ENTRY)
 	{
 		if(utimensat(context->dirfd, fname, tv, AT_SYMLINK_NOFOLLOW))
@@ -660,7 +661,7 @@ int tagfs_open(const char *path, struct fuse_file_info *ffi)
 		return -EISDIR;
 
 	int fd = openat(CONTEXT->dirfd, fname, ffi->flags);
-	
+
 	if(fd < 0)
 		return -errno;
 
@@ -776,7 +777,7 @@ int tagfs_listxattr(const char *path, char *buf, size_t len)
 			{
 				if(len < sizeof(aname))
 					return -ERANGE;
-					
+
 				memcpy(buf, aname, sizeof(aname));
 			}
 
@@ -796,7 +797,7 @@ int tagfs_truncate(const char *_path, off_t len)
 		return -errno;
 	if(kind != TDB_FILE_ENTRY)
 		return -EISDIR;
-	
+
 	int fd = openat(CONTEXT->dirfd, fname, O_WRONLY);
 
 	if(fd == -1)
@@ -805,7 +806,7 @@ int tagfs_truncate(const char *_path, off_t len)
 	errno = 0;
 	ftruncate(fd, len);
 	close(fd);
-	
+
 	return -errno;
 }
 
@@ -821,7 +822,7 @@ int tagfs_unlink(const char *_path)
 		RET_REL(-errno);
 	if(entry)
 		tdb_rmE(TDB, entry);
-		
+
 	unlock();
 
 	if((kind == TDB_FILE_ENTRY) && unlinkat(CONTEXT->dirfd, fname, 0))
@@ -844,7 +845,7 @@ int tagfs_rmdir(const char *_path)
 		RET_REL(-ENOTDIR);
 	if(entry)
 		tdb_rmE(TDB, entry);
-		
+
 	unlock();
 	return 0;
 }
@@ -864,7 +865,7 @@ int tagfs_rename(const char *path, const char *npath)
 
 	if(!kind)
 		goto err;
-	
+
 	const char *nfname;
 	char *query = split(npath, &nfname);
 	bitarr_t pos = bitarr_new(tdb->tagCap);
@@ -882,14 +883,14 @@ int tagfs_rename(const char *path, const char *npath)
 		if(!e && bitarr_any(pos, tdb->tagCap, true))
 		{
 			e = tdb_ins(tdb, nfname, TDB_FILE_ENTRY);
-			
+
 			if(!e)
 				goto err;
 		}
 
 		if(e)
 		{
-		#ifdef RELATIVE_RENAME	
+		#ifdef RELATIVE_RENAME
 			if(bitarr_all(pos, tdb->tagCap, false) && bitarr_all(neg, tdb->tagCap, false))
 				bitarr_fill(e->fileTags, 0, tdb->tagCap, false);
 			else
@@ -899,7 +900,7 @@ int tagfs_rename(const char *path, const char *npath)
 		#endif
 		}
 	}
-	
+
 	if(strcmp(nfname, ofname))
 	{
 		if(kind == TDB_FILE_ENTRY && renameat(CONTEXT->dirfd, ofname, CONTEXT->dirfd, nfname))
@@ -934,7 +935,7 @@ void *tagfs_init(struct fuse_conn_info *conn)
 	{ // print a separator for easier browsing of the log file
 		for (int i = 0; i < 80; i++)
 			fputc('=', CONTEXT->log);
-		
+
 		fputc('\n', CONTEXT->log);
 	}
 
