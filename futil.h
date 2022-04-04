@@ -2,7 +2,8 @@
 #ifndef _FUTIL_H
 #define _FUTIL_H
 #include <stdio.h>
-#include "dynbuf.h"
+#include <stdbool.h>
+#include <stdlib.h>
 
 /* Reads a string with escaped newlines and backslashes from a file. Returns NULL and sets errno on malloc failure. */
 char *readfield(FILE *f);
@@ -11,21 +12,23 @@ bool writefield(FILE *f, const char *str);
 
 char *readfield(FILE *f)
 {
-	dynbuf_t buf = {};
+	char *buf = NULL;
+	size_t len;
+	FILE *bf = open_memstream(&buf, &len);
+
+	if(!bf)
+		goto _err;
+
 	int c;
 	bool esc = false;
-	
+
 	while(c = fgetc(f), c != EOF && c)
 	{
 		if(esc)
 		{
-			if(c != '\\' && c != '\n')
-			{
-				if(!dynbuf_ins(&buf, '\\'))
-					goto err;
-			}
-
-			if(!dynbuf_ins(&buf, c))
+			if(c != '\\' && c != '\n' && fputc('\\', bf) == EOF)
+				goto err;
+			if(fputc(c, bf) == EOF)
 				goto err;
 
 			esc = false;
@@ -36,25 +39,24 @@ char *readfield(FILE *f)
 				esc = true;
 			else if(c == '\n')
 				break;
-			else
-			{
-				if(!dynbuf_ins(&buf, c))
-					goto err;
-			}
+			else if(fputc(c, bf) == EOF)
+				goto err;
 		}
 	}
 
 	// either EOF or \0 ended the field before matching character
-	if(esc)
-	{
-		if(!dynbuf_ins(&buf, '\\'))
-			goto err;
-	}
+	if(esc && fputc('\\', bf) == EOF)
+		goto err;
 
-	return dynbuf_end(&buf);
+	if(fclose(bf))
+		goto _err;
+
+	return buf;
 
 	err:
-	dynbuf_free(&buf);
+	fclose(bf);
+	_err:
+	free(buf);
 
 	return NULL;
 }
