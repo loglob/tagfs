@@ -599,6 +599,11 @@ int tagfs_mkdir(const char *_path, mode_t mode)
 	tagdb_t *tdb = TDB;
 	const char *fname;
 
+	#ifdef BLOCK_TRASH_CREATION
+		if(!strncmp(_path, "/.Trash", 6))
+			return -EINVAL;
+	#endif
+
 	if((mode & CONTEXT->realStat.st_mode & 0777) != (mode & 0777))
 	{
 		int rm = CONTEXT->realStat.st_mode;

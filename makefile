@@ -3,14 +3,14 @@ CFLAGS = -lcrypto -lexplain -lpthread
 TEST_H := $(wildcard ./*_test.h)
 TESTS := $(patsubst ./%.h,./%,$(TEST_H))
 GRINDS := $(patsubst ./%.h,./%_grind,$(TEST_H))
-DEFS := -DRELATIVE_RENAME -DLIST_NEGATED_TAGS
+DEFS := -DRELATIVE_RENAME -DLIST_NEGATED_TAGS -DBLOCK_TRASH_CREATION
 LIBS := -lfuse
 
 tagfs-debug: tagfs.c tagfs.h tagdb.h hashmap.h bitarr.h futil.h
 	$(CC) -g $(DEFS) -DMALLOC_CHECK_ -DDEBUG -DTRACE "$<" ${CFLAGS} -lfuse -o "$@"
 
 tagfs: tagfs.c tagfs.h tagdb.h hashmap.h bitarr.h futil.h
-	$(CC) $(DEFS) "$<" -o "$@" -lfuse -lpthread ${CFLAGS}
+	$(CC) $(DEFS) -O "$<" -o "$@" -lfuse ${CFLAGS}
 
 remount: umount mount
 
