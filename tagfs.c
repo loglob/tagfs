@@ -1,4 +1,5 @@
 /* tagfs.c: handled initializing and interfacing with fuse. The actual functions are declared in tagfs.h */
+#include "config.h"
 #include "tagfs.h"
 #include <unistd.h>
 #include <limits.h>

@@ -17,18 +17,8 @@ Run `make tagfs` to build the tagfs executable.
 
 ### switches
 To build manually, use tagfs.c as main file and link libcrypto, libfuse and libexplain.
-The following switches change the behaviour of tagfs:
-By default they are all defined.
-
-#### RELATIVE_RENAME
-Controls how the tags of a file are changed by renaming (i.e. via mv).
-If the switch is not defined, the file's tags are overwritten with the tags in the target path and negated tags are ignored.
-If it is defined, the default behaviour, as specified above, is used.
-
-#### LIST_NEGATED_TAGS
-Controls whether or not negated tags are shown by readdir (i.e. via ls).
-If the switch is not defined, a directory listing will never contain negated tags.
-If it is defined, a directory listing will contain the negation of every tag not already present in the query.
+Look at `config.h` for a list of available switches, which are all active by default.
+To opt out, define `NO_<switch>` in your compile options, or edit the `config.h` file.
 
 ## usage
 Run `tagfs <target path>` to mount a tagfs instance at the given path.

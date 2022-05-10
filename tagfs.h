@@ -358,19 +358,6 @@ static tagdb_entrykind_t tagfs_resolve(const char *_path, tagdb_entry_t **_entry
 	#undef ERR
 }
 
-/* Determines if the given entry name exists.
-	Sets errno to 0, regardless of output. */
-inline static bool tagfs_exists(const char *entry)
-{
-	errno = 0;
-
-	if(tagfs_get(entry, TFS_CHKALL) || !errno)
-		return true;
-
-	errno = 0;
-	return false;
-}
-
 #pragma region rwlock functions
 
 // Returns v after releasing lock.
@@ -606,10 +593,9 @@ int tagfs_mkdir(const char *_path, mode_t mode)
 
 	if((mode & CONTEXT->realStat.st_mode & 0777) != (mode & 0777))
 	{
-		int rm = CONTEXT->realStat.st_mode;
 		#define octal(n) ((n & 0700) >> 6), ((n & 070) >> 3), (n & 07)
 		dbprintf("Refusing mkdir() with mode %d%d%d, which is incompatible with root mode %d%d%d\n",
-											octal(mode),							octal(rm));
+										octal(mode),							octal(CONTEXT->realStat.st_mode));
 		#undef octal
 		return -ENOTSUP;
 	}
@@ -869,7 +855,7 @@ int tagfs_rename(const char *path, const char *npath)
 	tagdb_t *tdb = TDB;
 
 	if(!kind)
-		goto err;
+		RET_REL(-errno);
 
 	const char *nfname;
 	char *query = split(npath, &nfname);
